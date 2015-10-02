@@ -1,0 +1,2 @@
+# dagitik
+GSU Dağıtık Sistemler
