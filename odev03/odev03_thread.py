@@ -2,6 +2,7 @@
 
 import sys
 import threading
+import Queue
 
 class crypt_thread(threading.Thread):
 	def __init__(self,threadID,name,alphabet,key,plain_text,crypted_text):
@@ -14,6 +15,7 @@ class crypt_thread(threading.Thread):
 		self.crypted_text=crypted_text
 	def run(self):
 		print "islem yapiliyor"
+		
 
 def crypt_string(alphabet,key,plain):
 
@@ -32,6 +34,10 @@ else:
 	head,tail=alphabet[:alphabet_len-s],alphabet[alphabet_len-s:]
 	key=tail+head
 	key=key.upper()
+	
+	queue_lock=threading.Lock()
+	read_queue=Queue.Queue(10)
+	write_queue=Queue.Queue(10)
 	
 	fo=open("metin.txt","r")
 	
