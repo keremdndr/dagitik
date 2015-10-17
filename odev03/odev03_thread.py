@@ -15,6 +15,10 @@ class crypt_thread(threading.Thread):
 	def run(self):
 		print "islem yapiliyor"
 
+def crypt_string(alphabet,key,plain):
+
+def read_from_file(file_object,read_size):
+	return fo.read(read_size)
 
 if len(sys.argv) != 4:
 	print "Usage: python odev03_thread.py <shifting> <threads> <block_length>"
@@ -28,4 +32,9 @@ else:
 	head,tail=alphabet[:alphabet_len-s],alphabet[alphabet_len-s:]
 	key=tail+head
 	key=key.upper()
+	
+	fo=open("metin.txt","r")
+	
+	
+
 
