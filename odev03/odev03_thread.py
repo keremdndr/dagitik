@@ -27,23 +27,41 @@ class writer_thread(threading.Thread):
 	def run(self):
 		
 class crypter_thread(threading.Thread):
-	def __init__(self,threadID,name,alphabet,key,plain_text,crypted_text):
+	def __init__(self,threadID,name,alphabet,key,write_queue,crypt_queue):
 		threading.Thread.__init__(self)
 		self.threadID=threadID
 		self.name=name
 		self.alphabet=alphabet
 		self.key=key
-		self.plain_text=plain_text
-		self.crypted_text=crypted_text
+		self.cq=crypt_queue
+		self.wq=write_queue
 	def run(self):
-		print "islem yapiliyor"
+		crypt_string(self.alphabet,self.key)
 		
 
-def crypt_string(alphabet,key,plain):
-		
+def crypt_string(alphabet,key,write_queue,crypt_queue):
+	while not True:
+		queue_lock_read.acquire()
+		if not write_queue.empty()
+			text=write_queue.get()
+			queue_lock_read.release()
+			data=''
+			for c in text[0]:
+				if c in alphabet:
+					data+=key[alphabet.find(c)]
+				else:
+					data+=c
+			crypt=(data,text[1])
+			queue_lock_crypt.acquire()
+			crypt_queue.put(crypt)
+			queue_lock_crypt.release()
+		else:
+			queue_lock_read.release()
+			if write_finished:
+				break
+						
 def read_from_file(file_object,read_size,write_queue):
 	index=1
-	queue_lock_write.acquire()
 	while(True)
 		text=fo.read(read_size)
 		if(text==''):
@@ -51,9 +69,15 @@ def read_from_file(file_object,read_size,write_queue):
 		text=(text.lower,index)
 		write_queue.put(text)
 		index+=1
-	queue_lock_write.release()
-	write_finish=True
+	global write_finished
+	write_finished=True
 	
+def write_to_file(file_object,write_size,crypt_queue):
+	index=1
+	while(not crypt_queue.empty())
+		data=crypt_queue.get()	
+		file_object.write(data[0])
+		index+=1
 if len(sys.argv) != 4:
 	print "Usage: python odev03_thread.py <shifting> <threads> <block_length>"
 	sys.exit("Invalid arguments")
@@ -67,10 +91,12 @@ else:
 	key=tail+head
 	key=key.upper()
 	
-	queue_lock_write=threading.Lock()
+	queue_lock_read=threading.Lock()
 	queue_lock_crypt=threading.Lock()
 	read_queue=Queue.Queue(10)
-	write_queue=Queue.Queue(10)
+	write_queue=Queue.Queue(30)
+	
+	write_finished=False
 	
 	fo=open("metin.txt","r")
 	fo.close()
