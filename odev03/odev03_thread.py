@@ -17,15 +17,14 @@ class reader_thread(threading.Thread):
 		read_from_file(self.fo,self.rs,self.wq)
 
 class writer_thread(threading.Thread):
-	def __init__(self,threadID,name,crypt_queue,file_object,read_size):
+	def __init__(self,threadID,name,crypt_queue,file_object):
 		threading.Thread.__init__(self)
 		self.ID=threadID
 		self.name=name
 		self.cq=crypt_queue
 		self.fo=file_object
-		self.rs=read_size
 	def run(self):
-		write_to_file(self.fo,read_size,self.cq)
+		write_to_file(self.fo,self.cq)
 class crypter_thread(threading.Thread):
 	def __init__(self,threadID,name,alphabet,key,write_queue,crypt_queue):
 		threading.Thread.__init__(self)
@@ -103,7 +102,7 @@ else:
 	
 	queue_lock_read=threading.Lock()
 	queue_lock_crypt=threading.Lock()
-	read_queue=Queue.Queue(10)
+	write_queue=Queue.Queue(10)
 	crypt_queue=Queue.Queue(10)
 	
 	write_finished=False
@@ -112,5 +111,18 @@ else:
 	write_file="crypted_"+str(s)+"_"+str(n)+"_"+str(l)+".txt"
 	f_write=open(write_file,"wb")
 	
-
-
+	threads=[]
+	thread=reader_thread(1,"Reader Thread",f_read,write_queue,l)
+	thread.start()
+	threads.append(thread)
+	for i in range(1,n+1):
+		thread=crypter_thread(i+1,"Crypter Thread"+str(i),alphabet,key,write_queue,crypt_queue)
+		thread.start()
+		threads.append(thread)
+	thread=writer_thread(i+2,"Writer Thread",crypt_queue,f_write)
+	thread.start()
+	threads.append(thread)
+	
+	for t in threads:
+		t.join()
+	print "Exiting Main"
