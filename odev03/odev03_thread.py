@@ -6,12 +6,11 @@ import Queue
 import time
 
 class reader_thread(threading.Thread):
-	def __init__(self,threadID,name,file_object,read_queue,write_queue,read_size):
+	def __init__(self,threadID,name,file_object,write_queue,read_size):
 		threading.Thread.__init(self)
 		self.threadID=threadID
 		self.name=name
 		self.fo=file_object
-		self.rq=read_queue
 		self.wq=write_queue
 		self.rs=read_size
 	def run(self):
@@ -37,13 +36,13 @@ class crypter_thread(threading.Thread):
 		self.cq=crypt_queue
 		self.wq=write_queue
 	def run(self):
-		crypt_string(self.alphabet,self.key)
+		crypt_string(self.alphabet,self.key,self.wq,self.cq)
 		
 
 def crypt_string(alphabet,key,write_queue,crypt_queue):
 	while True:
 		queue_lock_read.acquire()
-		if not write_queue.empty()
+		if not write_queue.empty():
 			text=write_queue.get()
 			queue_lock_read.release()
 			data=''
@@ -61,7 +60,7 @@ def crypt_string(alphabet,key,write_queue,crypt_queue):
 						
 def read_from_file(file_object,read_size,write_queue):
 	index=1
-	while True
+	while True:
 		text=fo.read(read_size)
 		if(text==''):
 			break
@@ -73,13 +72,18 @@ def read_from_file(file_object,read_size,write_queue):
 	
 def write_to_file(file_object,crypt_queue):
 	index=1
+	found=False
 	while True:
 		queue_lock_crypt.acquire()
 		if not crypt_queue.empty():
-			data=crypt_queue.get()	
-			queue_lock_crypt.release()
-			file_object.write(data[0])
-			index+=1
+			while not found:
+				data=crypt_queue.get()
+				if data[1]==index:
+					file_object.write(data[0])
+					queue_lock_crypt.release()
+					found=True
+				else:
+					crypt_queue.put(data)
 		else:
 			queue_lock_crypt.release()
 			time.sleep(1)
@@ -100,12 +104,13 @@ else:
 	queue_lock_read=threading.Lock()
 	queue_lock_crypt=threading.Lock()
 	read_queue=Queue.Queue(10)
-	write_queue=Queue.Queue(30)
+	crypt_queue=Queue.Queue(10)
 	
 	write_finished=False
 	
-	fo=open("metin.txt","r")
-	fo.close()
+	f_read=open("metin.txt","rb")
+	write_file="crypted_"+str(s)+"_"+str(n)+"_"+str(l)+".txt"
+	f_write=open(write_file,"wb")
 	
 
 
