@@ -22,8 +22,6 @@ class reader_thread(threading.Thread):
 			text_tup=(text.lower(),index)
 			self.wq.put(text_tup)
 			index+=1
-		global write_finished
-		write_finished=True
 
 class writer_thread(threading.Thread):
 	def __init__(self,threadID,name,crypt_list,file_object):
@@ -34,6 +32,7 @@ class writer_thread(threading.Thread):
 		self.fo=file_object
 	def run(self):
 		index=1
+		found=False
 		while True:
 			queue_lock_crypt.acquire()
 			if len(self.cl) !=0:
@@ -43,10 +42,15 @@ class writer_thread(threading.Thread):
 						queue_lock_crypt.release()
 						self.fo.write(data[0])
 						index+=1
+						found=True
 						break
+				if not found:
+					queue_lock_crypt.release()
+				else:
+					found=False
 			else:
 				queue_lock_crypt.release()
-				if write_finished==True:
+				if crypt_finished:
 					break
 
 class crypter_thread(threading.Thread):
@@ -76,7 +80,7 @@ class crypter_thread(threading.Thread):
 				queue_lock_crypt.release()
 			else:
 				queue_lock_read.release()
-				if write_finished:
+				if read_finished:
 					break
 				
 				
@@ -99,27 +103,32 @@ else:
 	write_queue=Queue.Queue(10)
 	crypt_list=[]
 	
-	write_finished=False
-	exit_writing=False
+	read_finished=False
+	crypt_finished=False
 	f_read=open("metin.txt","rb")
 	write_file="crypted_"+str(s)+"_"+str(n)+"_"+str(l)+".txt"
 	f_write=open(write_file,"wb")
 	
 	threads=[]
-	thread=reader_thread(1,"Reader Thread",f_read,write_queue,l)
-	thread.start()
-	print thread.name + " basladi"
-	threads.append(thread)
+	thread_r=reader_thread(1,"Reader Thread",f_read,write_queue,l)
+	thread_r.start()
+	print thread_r.name + " basladi"
 	for i in range(1,n+1):
-		thread=crypter_thread(i+1,"Crypter Thread"+str(i),alphabet,key,write_queue,crypt_list)
-		thread.start()
-		print thread.name + " basladi"
-		threads.append(thread)
-	thread=writer_thread(i+2,"Writer Thread",crypt_list,f_write)
-	thread.start()
-	print thread.name + " basladi"
-	threads.append(thread)
+		thread_c=crypter_thread(i+1,"Crypter Thread"+str(i),alphabet,key,write_queue,crypt_list)
+		thread_c.start()
+		print thread_c.name + " basladi"
+		threads.append(thread_c)
+	thread_w=writer_thread(i+2,"Writer Thread",crypt_list,f_write)
+	thread_w.start()
+	print thread_w.name + " basladi"
 	
+	thread_r.join()
+	read_finished=True
+	print "Read Thread Finished"
 	for t in threads:
 		t.join()
+		print t.name + " finished"
+	crypt_finished=True
+	thread_w.join()
+	print "Write Thread Finished"
 	print "Exiting Main"
