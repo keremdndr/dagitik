@@ -6,18 +6,38 @@ from multiprocessing import Process,Queue,Lock,current_process()
 
 def reader(read_size,read_queue):
 	try:
+		p=current_process()
 		file_r=open("metin.txt","rb")
 		data='x'
 		index=1
 		while data!='':
+			print p.name
 			data=file_r.read(read_size)
 			data_i=(data,i)
 			read_queue.put(data_i)
 			i+=1
 	except Ex:
-		print Ex.strerror 
+		print "in "+p.name+" error "+ Ex.strerror 
 	
-def crypter():
+def crypter(alphabet,key,read_queue,crypt_queue):
+	data=''
+	crypt=''
+	try:
+		read_lock.acquire()
+		while not read_queue.empty():
+			text=read_queue.get()
+			read_lock.release()
+			for c in text[0]:
+				if c in alphabet:
+					data+=key[alphabet.find(c)]
+				else:
+					data+=c
+				
+				crypt=(data,text[1])
+				crypt_lock.acquire()
+				crypt_queue.put(crypt)
+				crypt_lock.release()
+
 
 def writer():
 
