@@ -130,5 +130,7 @@ else:
 		print t.name + " finished"
 	crypt_finished=True
 	thread_w.join()
+	f_read.close()
+	f_write.close()
 	print "Write Thread Finished"
 	print "Exiting Main"
