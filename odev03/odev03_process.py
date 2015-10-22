@@ -11,42 +11,30 @@ def reader(read_size,read_queue):
 		data=''
 		index=1
 		while True:
-			#read_lock.acquire()
-			#if read_queue.full():
-			#	read_lock.release()
-			#	time.sleep(0.2)
-			#else:
-				data=file_r.read(read_size)
-				if data=='':
-					break
-				data_i=(data,index)
-				#print "Writing to read queue",index
-				read_queue.put(data_i)
-				#read_lock.release()
-				index+=1
+			data=file_r.read(read_size)
+			if data=='':
+				break
+			data_i=(data,index)
+			read_queue.put(data_i)
+			index+=1
 		file_r.close()
 	except Exception:
 		file_r.close()
 		print "in "+p.name+" error "
-	print "Reading Finished-----------------------------------------------------------"
 	read_queue.put(('',0))
  
 def crypter(alphabet,key,read_queue,crypt_queue):
 	p=current_process()
-	print p.name	
+	print p.name,"started"
 	data=''
 	crypt=''
 	while True:
 		read_lock.acquire()
 		if read_queue.empty():
-			#print "Read queue empty!!!!!"
 			read_lock.release()
 			time.sleep(0.2)
 		else:
 			text=read_queue.get()
-			#print "Reading from READ queue",current_process().name,text[1]
-			#print text, current_process().name
-			#print text[1]
 			if text[1]==0:
 				read_queue.put(text)
 				read_lock.release()
@@ -59,7 +47,6 @@ def crypter(alphabet,key,read_queue,crypt_queue):
 					data+=c
 			
 			crypt=(data,text[1])
-			#print "Writing to CRYPT queue",current_process().name,crypt[1]
 			crypt_queue.put(crypt)
 	crypt_queue.put(('',-1))
 	print p.name,"Crypting finished"
@@ -73,12 +60,10 @@ def writer(crypt_queue,filename,thread_count):
 	finish=False
 	while not finish:
 		if len(crypt_list)!=0:
-			#print "Listeye bakiyor",index
 			for c in crypt_list:
 				if c[1]==index:
 					found=True
 					f_write.write(c[0])
-					#print "Writing to file",index
 					crypt_list.pop(crypt_list.index(c))					
 					index+=1
 					break
@@ -90,20 +75,16 @@ def writer(crypt_queue,filename,thread_count):
 					crypt_lock.release()
 					time.sleep(0.1)
 					continue
-				#print "Reading from CRYPT queue"
 				crypt=crypt_queue.get()
 				crypt_lock.release()
 				if crypt[1]==index:
 					f_write.write(crypt[0])
-					#print "Writing to file",index
 					index+=1
 				else:
 					crypt_list.append(crypt)
 		else:
-			#print "Queue'ya bakiyor",index
 			crypt_lock.acquire()
 			if crypt_queue.empty():
-				#print "Crypt queue bos ------"
 				crypt_lock.release()
 				time.sleep(0.2)
 				continue
@@ -111,10 +92,8 @@ def writer(crypt_queue,filename,thread_count):
 			crypt_lock.release()
 			if crypt[1]==index:
 				f_write.write(crypt[0])
-				#print "Writing to file",index
 				index+=1
 			else:
-				#print "Listeye ekliyor",crypt[1]
 				crypt_list.append(crypt)
 		if len(crypt_list)==thread_count and crypt_queue.empty():
 			for c in crypt_list:
