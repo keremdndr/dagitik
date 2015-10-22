@@ -52,7 +52,7 @@ def crypter(alphabet,key,read_queue,crypt_queue):
 				read_lock.release()
 				break
 			read_lock.release()
-			for c in text[0]:
+			for c in text[0].lower():
 				if c in alphabet:
 					data+=key[alphabet.find(c)]
 				else:
@@ -60,6 +60,7 @@ def crypter(alphabet,key,read_queue,crypt_queue):
 			
 			crypt=(data,text[1])
 			#print "Writing to CRYPT queue",current_process().name,crypt[1]
+			crypt_queue.put(crypt)
 	crypt_queue.put(('',-1))
 	print p.name,"Crypting finished"
 	
@@ -72,11 +73,12 @@ def writer(crypt_queue,filename,thread_count):
 	finish=False
 	while not finish:
 		if len(crypt_list)!=0:
+			#print "Listeye bakiyor",index
 			for c in crypt_list:
 				if c[1]==index:
 					found=True
 					f_write.write(c[0])
-					print "Writing to file"
+					#print "Writing to file",index
 					crypt_list.pop(crypt_list.index(c))					
 					index+=1
 					break
@@ -88,18 +90,20 @@ def writer(crypt_queue,filename,thread_count):
 					crypt_lock.release()
 					time.sleep(0.1)
 					continue
-				print "Reading from CRYPT queue"
+				#print "Reading from CRYPT queue"
 				crypt=crypt_queue.get()
 				crypt_lock.release()
 				if crypt[1]==index:
 					f_write.write(crypt[0])
-					print "Writing to file"
+					#print "Writing to file",index
 					index+=1
 				else:
 					crypt_list.append(crypt)
 		else:
+			#print "Queue'ya bakiyor",index
 			crypt_lock.acquire()
 			if crypt_queue.empty():
+				#print "Crypt queue bos ------"
 				crypt_lock.release()
 				time.sleep(0.2)
 				continue
@@ -107,11 +111,12 @@ def writer(crypt_queue,filename,thread_count):
 			crypt_lock.release()
 			if crypt[1]==index:
 				f_write.write(crypt[0])
-				print "Writing to file"
+				#print "Writing to file",index
 				index+=1
 			else:
+				#print "Listeye ekliyor",crypt[1]
 				crypt_list.append(crypt)
-		if len(crypt_list)==thread_count:
+		if len(crypt_list)==thread_count and crypt_queue.empty():
 			for c in crypt_list:
 				if c[1]!=-1:
 					finish=False
@@ -133,8 +138,8 @@ if __name__=='__main__':
 		key=tail+head
 		key=key.upper()
 		
-		read_queue=Queue(400)
-		crypt_queue=Queue(400)
+		read_queue=Queue(1000)
+		crypt_queue=Queue(1000)
 		read_lock=Lock()
 		crypt_lock=Lock()
 		
