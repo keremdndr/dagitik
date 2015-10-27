@@ -14,7 +14,7 @@ class myThread (threading.Thread):
 		while True:
 			rand = randint(1,100)
 			wait(rand) 
-			self.clientSocket.sendall("Merhaba, saat şuan" + time.asctime())
+			self.clientSocket.sendall("Merhaba, saat suan" + time.asctime())
 		print "Ending Thread-" + str(self.threadID)
 s = socket.socket()
 host = socket.gethostname()
