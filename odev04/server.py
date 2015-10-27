@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+import threading
+import socket
+from time import asctime
+from random import randint
 class myThread (threading.Thread):
 	def __init__(self, threadID, clientSocket, clientAddr):
 		threading.Thread.__init__(self)
@@ -7,15 +11,13 @@ class myThread (threading.Thread):
 		self.clientAddr = clientAddr
 	def run(self):
 		print "Starting Thread-" + str(self.threadID)
-		...
-		...
-		...
+		while True:
+			rand = randint(1,100)
+			wait(rand) 
+			self.clientSocket.sendall("Merhaba, saat şuan" + time.asctime())
 		print "Ending Thread-" + str(self.threadID)
-		...
-		...
-		...
 s = socket.socket()
-host = "0.0.0.0"
+host = socket.gethostname()
 port = 12345
 s.bind((host, port))
 s.listen(5)
