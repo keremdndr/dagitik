@@ -4,6 +4,7 @@ import socket
 from time import asctime,sleep
 from random import randint
 
+Stop = False
 class serverSend (threading.Thread):
 	def __init__(self,threadID,clientSocket,clientAddr):
 		threading.Thread.__init__(self)
@@ -12,11 +13,14 @@ class serverSend (threading.Thread):
 		self.clientAddr= clientAddr
 	def run(self):
 		try:
-			while True:
+			while not Stop:
 				sleep(randint(1,60))
+				if Stop:
+					break
 				self.clientSocket.sendall("Merhaba, saat suan " + asctime())
 		except Exception, e:
 			print "Hata thread sender",threadID,":",e
+		print "Sender Thread",threadID,"sonlandirildi"
 class serverReceive (threading.Thread):
 	def __init__(self, threadID, clientSocket, clientAddr):
 		threading.Thread.__init__(self)
@@ -28,12 +32,14 @@ class serverReceive (threading.Thread):
 		try:
 			while True:
 				rec=self.clientSocket.recv(1024)
-				print rec
-				ans="Peki "+str(self.clientAddr[0])+":"+str(self.clientAddr[1])
-				if rec != "":					
-					self.clientSocket.sendall(ans)
-				elif rec == "exit":
+				if rec == "eof":
+					global Stop
+					Stop = True
 					break
+				elif rec != "":
+					print rec			
+					ans="Peki "+str(self.clientAddr[0])+":"+str(self.clientAddr[1])
+					self.clientSocket.sendall(ans)
 					
 		except Exception,e:
 			print "Hata thread receiver",str(self.threadID),":",e 

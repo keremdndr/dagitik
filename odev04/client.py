@@ -32,15 +32,15 @@ try:
 
 	rThread = readThread(s)
 	rThread.start()
-	print "To Exit, enter 'exit'"
+	print "To Exit, enter 'eof'"
 	while True:
 		inp=raw_input(">>")
-		if inp.lower()=="exit":
+		wThread = writeThread(s,inp)
+		wThread.start()
+		if inp.lower()=="eof":
 			Stop = True
 			break
-		else:
-			wThread = writeThread(s,inp)
-			wThread.start()
+
 except KeyboardInterrupt:
 	print "Keyboard Interrupt"
 except Exception:
