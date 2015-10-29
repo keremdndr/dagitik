@@ -8,7 +8,7 @@ class readThread (threading.Thread):
 		self.s=servSock
 	def run(self):
 		try:
-			while True:
+			while not Stop:
 				rec = self.s.recv(1024)
 				print "Server:",rec
 		except Exception,Argument:
@@ -23,6 +23,7 @@ class writeThread (threading.Thread):
 			self.s.sendall(inp)
 		except Exception,Argument:
 			print Argument
+Stop = False
 try:
 	s = socket.socket()
 	host = socket.gethostname()
@@ -34,9 +35,8 @@ try:
 	print "To Exit, enter 'exit'"
 	while True:
 		inp=raw_input(">>")
-		print inp
 		if inp.lower()=="exit":
-			s.close()
+			Stop = True
 			break
 		else:
 			wThread = writeThread(s,inp)
