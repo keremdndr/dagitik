@@ -26,15 +26,16 @@ class WriteThread (threading.Thread):
             queue_message = self.threadQueue.get()
             # gonderilen ozel mesajsa
             if queue_message[2]=="MSG":
-                message_to_send = "MSG " + queue_message[3]
+                message_to_send = "MSG " + queue_message[1]+" "+queue_message[3]
             # genel mesajsa
             elif queue_message[2]=="SAY":
-                message_to_send = "SAY "+queue_message[3]
+                message_to_send = "SAY "+queue_message[1]+" "+queue_message[3]
             # hicbiri degilse sistem mesajidir
             elif queue_message[2]=="QUI":
                 break
             else:
                 message_to_send = "SYS "+queue_message[3]
+            self.cSocket.sendall(message_to_send)
                 
     self.lQueue.put("Exiting " + self.name)
     
@@ -64,6 +65,9 @@ class ReadThread (threading.Thread):
                 self.fihrist[dataList]=self.threadQueue 
                 self.csend(response)
                 self.lQueue.put(self.nickname + " has joined.")
+                queue_message=(None,self.nickname,"SYS",self.nickname+" has joined.")
+                for q in self.fihrist.values():
+                    q.put(queue_message)
                 return 0
             else:
                 response = "REJ"
@@ -76,6 +80,9 @@ class ReadThread (threading.Thread):
             self.fihrist.pop(self.nickname)
             self.lQueue.put(self.nickname+" has left.")
             self.csend(response)
+            queue_message=(None,self.nickname,"SYS",self.nickname+" has left.")
+            for q in self.fihrist.values():
+                q.put(queue_message)
             self.cSocket.close()
             return "QUI"
             
@@ -124,23 +131,12 @@ class ReadThread (threading.Thread):
         self.lQueue.put("Starting " + self.name)
         while True:
             
-            # burasi blocking bir recv halinde duracak
-            # gelen protokol komutlari parserdan gecirilip
-            # ilgili hareketler yapilacak
             incpming_data=self.cSocket.recv()
             return_message = parser(incoming_data)
             if return_message=="QUI":
-                self.threadQueue.put("QUI",None,None)
+                self.threadQueue.put(None,None,"QUI",None)
                 break
             
-            # istemciye cevap h a z r l a .
-            ...
-            ...
-            # cevap veya cevaplari gondermek zere
-            # threadQueue'ya yaz
-            # lock mekanizmasini unutma
-            ...
-            ...
         self.lQueue.put("Exiting " + self.name)
         
 class LoggerThread (threading.Thread):
