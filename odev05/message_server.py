@@ -19,127 +19,120 @@ class WriteThread (threading.Thread):
     def run(self):
         self.lQueue.put("Starting " + self.name)
     while True:
-        ...
-        ...
-        ...
+        
         # burasi kuyrukta sirasi gelen mesajlari
         # gondermek icin kullanilacak
         if self.threadQueue.qsize() > 0:
             queue_message = self.threadQueue.get()
             # gonderilen ozel mesajsa
-        if ...
-            message_to_send = "MSG " + ...
-        # genel mesajsa
-        elif queue_message[1]:
-            message_to_send = "SAY " + ...
-        # hicbiri degilse sistem mesajidir
-        else:
-            message_to_send = "SYS " + ...
-            ...
-            ...
-            ...
+            if queue_message[2]=="MSG":
+                message_to_send = "MSG " + queue_message[3]
+            # genel mesajsa
+            elif queue_message[2]=="SAY":
+                message_to_send = "SAY "+queue_message[3]
+            # hicbiri degilse sistem mesajidir
+            elif queue_message[2]=="QUI":
+                break
+            else:
+                message_to_send = "SYS "+queue_message[3]
+                
     self.lQueue.put("Exiting " + self.name)
     
 class ReadThread (threading.Thread):
-    def __init__(self, name, cSocket, address, logQueue):
-    threading.Thread.__init__(self)
-    self.nickname=None
-    self.name = name
-    self.cSocket = cSocket
-    self.address = address
-    self.lQueue = logQueue
-    self.fihrist = fihrist
-    self.tQueue = threadQueue
+    def __init__(self, name, cSocket, address, threadQueue,logQueue):
+        threading.Thread.__init__(self)
+        
+        self.nickname=""
+        self.name = name
+        self.cSocket = cSocket
+        self.address = address
+        self.lQueue = logQueue
+        self.fihrist = fihrist
+        self.tQueue=threadQueue
     def csend(self,data):
         self.cSocket.sendall(data)
     def parser(self, data):
-        data = data.strip()
-        
-        if not self.nickname and not data[0:3] == "USR":
-            response="ERL"            
+        dataList = data.strip().split()
+        #USR kayitli degilse ve ilk istek USR degilse login hatasi
+        if not self.nickname and not dataList[0] == "USR":
+            response = "ERL"
             self.csend(response)
-            
-        return 1
-        # data sekli bozuksa
-        if ...
-            response = "ERR"
-            self.csend(response)
-            return 0
-        if data[0:3] == "USR":
-            nickname = data[4:]
-        if ...
-            # kullanici yoksa
-            response = "HEL " + nickname
-            ...
-            ...
-            # fihristi guncelle
-            self.fihrist.update(...)
-            ...
-            ...
-            self.lQueue.put(self.nickname + " has joined.")
-            return 0
-        else:
-            # kullanici reddedilecek
-            response = "REJ " + nickname
-            self.csend(response)
-            ....
-            # baglantiyi kapat
-            self.csoc.close()
-            return 1
-        elif data[0:3] == "QUI":
+        #USR girisi   
+        elif dataList[0] == "USR":
+            if dataList[1] not in self.fihrist:
+                response = "HEL " + self.nickname
+                self.fihrist[dataList]=self.threadQueue 
+                self.csend(response)
+                self.lQueue.put(self.nickname + " has joined.")
+                return 0
+            else:
+                response = "REJ"
+                self.csend(response)
+                self.cSocket.close()
+                return 1
+                
+        elif dataList[0] == "QUI":
             response = "BYE " + self.nickname
-            ...
-            ...
-            # fihristten sil
-            ...
-            ...
-            # log gonder
-            ...
-            # baglantiyi sil
-            ...
-            ...
-        elif data[0:3] == "LSQ":
+            self.fihrist.pop(self.nickname)
+            self.lQueue.put(self.nickname+" has left.")
+            self.csend(response)
+            self.cSocket.close()
+            return "QUI"
+            
+        elif dataList[0] == "LSQ":
             response = "LSA "
-            ...
-            ...
-        elif data[0:3] == "TIC":
-            ...
-            ...
-        elif data[0:3] == "SAY":
-            ...
-            ...
-        elif data[0:3] == "MSG":
-            ...
-            ...
-            ...
+            for k in self.fihrist.keys():
+                response+=k
+                response+=":"
+            self.csend(response)
+            self.lQueue.put(self.nickname+" has requested for user list.")
+            return 0
+        
+        elif dataList[0] == "TIC":
+            response = "TOC"
+            self.csend(response)
+            return 0
+        
+        elif dataList[0] == "SAY":
+            response= "SOK"
+            message_type="SAY"
+            queue_message = (None,self.nickname,message_type,dataList[1])
+            for q in self.fihrist.values():
+                q.put(queue_message)
+            self.csend(response)
+            return 0
+            
+        elif dataList[0] == "MSG":
+            to_nickname,message = dataList[1].split(":")
             if not to_nickname in self.fihrist.keys():
                 response = "MNO"
             else:
-                queue_message = (to_nickname, self.nickname, message)
+                message_type="MSG"
+                queue_message = (to_nickname, self.nickname, message_type,message)
                 # gonderilecek threadQueueyu fihristten alip icine yaz
                 self.fihrist[to_nickname].put(queue_message)
                 response = "MOK"
             self.csend(response)
+            return 0
         else:
         # bir seye uymadiysa protokol hatasi verilecek
             response = "ERR"
-            ...
-            ...
-            ...
+            self.csend(response)
+            return 1
+            
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while True:
-            ...
-            ...
-            ...
+            
             # burasi blocking bir recv halinde duracak
             # gelen protokol komutlari parserdan gecirilip
             # ilgili hareketler yapilacak
-            ...
-            ...
-            queue_message = parser(incoming_data)
-            ...
-            ...
+            incpming_data=self.cSocket.recv()
+            return_message = parser(incoming_data)
+            if return_message=="QUI":
+                self.threadQueue.put("QUI",None,None)
+                break
+            
             # istemciye cevap h a z r l a .
             ...
             ...
@@ -149,3 +142,28 @@ class ReadThread (threading.Thread):
             ...
             ...
         self.lQueue.put("Exiting " + self.name)
+        
+class LoggerThread (threading.Thread):
+    def __init__(self, name, logQueue, logFileName):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.lQueue = logQueue
+        # dosyayi appendable olarak ac
+        self.fid = ...
+    def log(self,message):
+        # gelen mesaji zamanla beraber bastir
+        t = time.ctime()
+        self.fid.write(t + ...)
+        self.fid.flush()
+    def run(self):
+        self.log("Starting " + self.name)
+        while True:
+            ...
+            ...
+            ...
+            # lQueue'da yeni mesaj varsa
+            # self.log() metodunu cagir
+            to_be_logged = ...
+            self.log(to_be_logged)
+        self.log("Exiting" + self.name)
+        self.fid.close()
