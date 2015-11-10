@@ -64,6 +64,7 @@ class ReadThread (threading.Thread):
             #USR girisi   
             elif dataList[0] == "USR":
                 if not self.fihrist.has_key(dataList[1]):
+                    self.nickname = dataList[1]
                     response = "HEL " + self.nickname
                     self.fihrist[dataList[1]]=self.tQueue 
                     self.csend(response)
@@ -137,7 +138,7 @@ class ReadThread (threading.Thread):
             incoming_data=self.cSocket.recv(1024)
             return_message = self.parser(incoming_data)
             if return_message=="QUI":
-                self.tQueue.put(None,None,"QUI",None)
+                self.tQueue.put((None,None,"QUI",None))
                 break
          
         self.lQueue.put("Exiting " + self.name)
