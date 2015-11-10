@@ -65,7 +65,7 @@ class ReadThread (threading.Thread):
             elif dataList[0] == "USR":
                 if not self.fihrist.has_key(dataList[1]):
                     response = "HEL " + self.nickname
-                    self.fihrist[dataList]=self.tQueue 
+                    self.fihrist[dataList[1]]=self.tQueue 
                     self.csend(response)
                     self.lQueue.put(self.nickname + " has joined.")
                     queue_message=(None,self.nickname,"SYS",self.nickname+" has joined.")
