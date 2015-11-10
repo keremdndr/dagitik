@@ -78,7 +78,7 @@ class ReadThread (threading.Thread):
                     self.csend(response)
                     self.cSocket.close()
                     return 1
-                    
+            #USR cikis istegi        
             elif dataList[0] == "QUI":
                 response = "BYE " + self.nickname
                 self.fihrist.pop(self.nickname)
@@ -89,7 +89,7 @@ class ReadThread (threading.Thread):
                     q.put(queue_message)
                 self.cSocket.close()
                 return "QUI"
-                
+            #Kullanici listeleme    
             elif dataList[0] == "LSQ":
                 response = "LSA "
                 for k in self.fihrist.keys():
@@ -98,12 +98,12 @@ class ReadThread (threading.Thread):
                 self.csend(response)
                 self.lQueue.put(self.nickname+" has requested for user list.")
                 return 0
-            
+            #server kontrol mesaji
             elif dataList[0] == "TIC":
                 response = "TOC"
                 self.csend(response)
                 return 0
-            
+            #genl mesaj
             elif dataList[0] == "SAY":
                 response= "SOK"
                 message_type="SAY"
@@ -112,7 +112,7 @@ class ReadThread (threading.Thread):
                     q.put(queue_message)
                 self.csend(response)
                 return 0
-                
+            #ozel mesaj   
             elif dataList[0] == "MSG":
                 to_nickname,message = dataList[1].split(":")
                 if not to_nickname in self.fihrist.keys():
