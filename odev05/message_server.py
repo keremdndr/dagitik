@@ -29,10 +29,10 @@ class WriteThread (threading.Thread):
                 queue_message = self.tQueue.get()
                 # gonderilen ozel mesajsa
                 if queue_message[2]=="MSG":
-                    message_to_send = "MSG " + queue_message[1]+" "+queue_message[3]
+                    message_to_send = "MSG " + queue_message[1]+":"+queue_message[3]
                 # genel mesajsa
                 elif queue_message[2]=="SAY":
-                    message_to_send = "SAY "+queue_message[1]+" "+queue_message[3]
+                    message_to_send = "SAY "+queue_message[1]+":"+queue_message[3]
                 # hicbiri degilse sistem mesajidir
                 elif queue_message[2]=="QUI":
                     break
@@ -55,18 +55,18 @@ class ReadThread (threading.Thread):
     def csend(self,data):
         self.cSocket.sendall(data)
     def parser(self, data):
-        dataList = data.strip().split()
-        if len(dataList)!=0:
+        data = data.strip()
+        if len(data)!=0:
             #USR kayitli degilse ve ilk istek USR degilse login hatasi
-            if not self.nickname and not dataList[0] == "USR":
+            if not self.nickname and not data[0:3] == "USR":
                 response = "ERL"
                 self.csend(response)
             #USR girisi   
-            elif dataList[0] == "USR":
-                if not self.fihrist.has_key(dataList[1]):
-                    self.nickname = dataList[1]
+            elif data[0:3] == "USR":
+                if not self.fihrist.has_key(data[4:]):
+                    self.nickname = data[4:]
                     response = "HEL " + self.nickname
-                    self.fihrist[dataList[1]]=self.tQueue 
+                    self.fihrist[data[4:]]=self.tQueue 
                     self.csend(response)
                     self.lQueue.put(self.nickname + " has joined.")
                     queue_message=(None,self.nickname,"SYS",self.nickname+" has joined.")
@@ -79,7 +79,7 @@ class ReadThread (threading.Thread):
                     self.cSocket.close()
                     return 1
             #USR cikis istegi        
-            elif dataList[0] == "QUI":
+            elif data[0:3] == "QUI":
                 response = "BYE " + self.nickname
                 self.fihrist.pop(self.nickname)
                 self.lQueue.put(self.nickname+" has left.")
@@ -90,7 +90,7 @@ class ReadThread (threading.Thread):
                 self.cSocket.close()
                 return "QUI"
             #Kullanici listeleme    
-            elif dataList[0] == "LSQ":
+            elif data[0:3] == "LSQ":
                 response = "LSA "
                 for k in self.fihrist.keys():
                     response+=k
@@ -99,22 +99,22 @@ class ReadThread (threading.Thread):
                 self.lQueue.put(self.nickname+" has requested for user list.")
                 return 0
             #server kontrol mesaji
-            elif dataList[0] == "TIC":
+            elif data[0:3] == "TIC":
                 response = "TOC"
                 self.csend(response)
                 return 0
             #genl mesaj
-            elif dataList[0] == "SAY":
+            elif data[0:3] == "SAY":
                 response= "SOK"
                 message_type="SAY"
-                queue_message = (None,self.nickname,message_type,dataList[1])
+                queue_message = (None,self.nickname,message_type,data[4:])
                 for q in self.fihrist.values():
                     q.put(queue_message)
                 self.csend(response)
                 return 0
             #ozel mesaj   
-            elif dataList[0] == "MSG":
-                to_nickname,message = dataList[1].split(":")
+            elif data[0:3] == "MSG":
+                to_nickname,message = data[4:].split(":")
                 if not to_nickname in self.fihrist.keys():
                     response = "MNO"
                 else:
