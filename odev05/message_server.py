@@ -52,11 +52,13 @@ class ReadThread (threading.Thread):
         self.lQueue = logQueue
         self.fihrist = fihrist
         self.tQueue=threadQueue
+        self.i=0
     def csend(self,data):
         self.cSocket.sendall(data)
     def parser(self, data):
         data = data.strip()
         if len(data)!=0:
+            self.i=0
             #USR kayitli degilse ve ilk istek USR degilse login hatasi
             if not self.nickname and not data[0:3] == "USR":
                 response = "ERL"
@@ -110,6 +112,7 @@ class ReadThread (threading.Thread):
                 queue_message = (None,self.nickname,message_type,data[4:])
                 for q in self.fihrist.values():
                     q.put(queue_message)
+                
                 self.csend(response)
                 return 0
             #ozel mesaj   
@@ -130,7 +133,10 @@ class ReadThread (threading.Thread):
                 response = "ERR"
                 self.csend(response)
                 return 1
-            
+        else:
+            self.i+=1
+            if self.i==100:
+                return "QUI"
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while True:
