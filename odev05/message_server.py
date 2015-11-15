@@ -23,7 +23,6 @@ class WriteThread (threading.Thread):
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while True:
-            
             # burasi kuyrukta sirasi gelen mesajlari
             # gondermek icin kullanilacak
             if self.tQueue.qsize() > 0:
@@ -58,7 +57,9 @@ class ReadThread (threading.Thread):
         self.lock = lock
         self.i=0
     def csend(self,data):
+        self.lock.acquire()
         self.cSocket.sendall(data)
+        self.lock.release()
     def parser(self, data):
         data = data.strip()
         if len(data)!=0:
@@ -66,9 +67,7 @@ class ReadThread (threading.Thread):
             #USR kayitli degilse ve ilk istek USR degilse login hatasi
             if not self.nickname and not data[0:3] == "USR":
                 response = "ERL"
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
             #USR girisi   
             elif data[0:3] == "USR":
                 if not self.fihrist.has_key(data[4:]):
@@ -83,9 +82,7 @@ class ReadThread (threading.Thread):
                     return 0
                 else:
                     response = "REJ"
-                    self.lock.acquire()
                     self.csend(response)
-                    self.lock.release()
                     self.cSocket.close()
                     return 1
             #USR cikis istegi        
@@ -93,9 +90,7 @@ class ReadThread (threading.Thread):
                 response = "BYE " + self.nickname
                 self.fihrist.pop(self.nickname)
                 self.lQueue.put(self.nickname+" has left.")
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 queue_message=(None,self.nickname,"SYS",self.nickname+" has left.")
                 for q in self.fihrist.values():
                     q.put(queue_message)
@@ -107,17 +102,13 @@ class ReadThread (threading.Thread):
                 for k in self.fihrist.keys():
                     response+=k
                     response+=":"
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 self.lQueue.put(self.nickname+" has requested for user list.")
                 return 0
             #server kontrol mesaji
             elif data[0:3] == "TIC":
                 response = "TOC"
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 return 0
             #genl mesaj
             elif data[0:3] == "SAY":
@@ -126,9 +117,7 @@ class ReadThread (threading.Thread):
                 queue_message = (None,self.nickname,message_type,data[4:])
                 for q in self.fihrist.values():
                     q.put(queue_message)
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 return 0
             #ozel mesaj   
             elif data[0:3] == "MSG":
@@ -141,16 +130,12 @@ class ReadThread (threading.Thread):
                     # gonderilecek threadQueueyu fihristten alip icine yaz
                     self.fihrist[to_nickname].put(queue_message)
                     response = "MOK"
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 return 0
             else:
             # bir seye uymadiysa protokol hatasi verilecek
                 response = "ERR"
-                self.lock.acquire()
                 self.csend(response)
-                self.lock.release()
                 return 1
         else:
             self.i+=1
@@ -159,13 +144,11 @@ class ReadThread (threading.Thread):
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while True:
-            
             incoming_data=self.cSocket.recv(1024)
             return_message = self.parser(incoming_data)
             if return_message=="QUI":
                 self.tQueue.put((None,None,"QUI",None))
                 break
-         
         self.lQueue.put("Exiting " + self.name)
         
 class LoggerThread (threading.Thread):
