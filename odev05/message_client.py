@@ -169,7 +169,8 @@ class ClientDialog(QDialog):
     def run(self):
         ''' Run the app and show the main form. '''
         self.show()
-        self.qt_app.exec_()
+        #self.qt_app.exec_()
+        sys.exit(app.exec_())
 # connect to the server
 s = socket.socket()
 host = sys.argv[1]
@@ -177,7 +178,6 @@ port = int(sys.argv[2])
 s.connect((host,port))
 sendQueue = Queue.Queue(20)
 app = ClientDialog(sendQueue)
-app.daemon=True
 lock=threading.Lock()
 # start threads
 rt = ReadThread("ReadThread", s, sendQueue, app,lock)
