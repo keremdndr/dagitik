@@ -1,4 +1,4 @@
-__author__ = 'serhan'
+__author__ = 'hasan can volaka'
 
 from pyGraphics_ui import Ui_ImageProcessor
 from PyQt4.QtCore import *
