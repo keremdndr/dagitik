@@ -1,5 +1,3 @@
-__author__ = 'hasan can volaka'
-
 from pyGraphics_ui import Ui_ImageProcessor
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -10,6 +8,9 @@ import numpy as np
 import time
 import math
 
+__author__ = 'hasan can volaka'
+
+
 def rgb2gray(rgbint):
     # convert the 32 bit color into 8-bit grayscale
     b = rgbint & 255
@@ -17,72 +18,74 @@ def rgb2gray(rgbint):
     r = (rgbint >> 16) & 255
     return (r + g + b) // 3
 
+
 def gray2rgb(gray):
     # convert the 8bit ro 32bit (of course the color info is lost)
     return gray * 65536 + gray * 256 + gray
 
 
-class WorkerThread (threading.Thread):
+# noinspection SpellCheckingInspection,PyPep8Naming
+class WorkerThread(threading.Thread):
     def __init__(self, name, inQueue, outQueue, pLock):
         threading.Thread.__init__(self)
         self.name = name
-        self.inQueue = inQueue # the queue to read unprocessed data
-        self.outQueue = outQueue # the queue to put processed data
+        self.inQueue = inQueue  # the queue to read unprocessed data
+        self.outQueue = outQueue  # the queue to put processed data
         self.pLock = pLock
         self.patchsize = 128
 
     def convertGray(self, header, patch):
         # convert the patch to gray (actually does nothing as the incoming
-        # data is already 8bit grayscale data)
+        # data is already 8bit gray scale data)
         newMessage = [0] * self.patchsize * self.patchsize
-        for i in range(0,self.patchsize * self.patchsize):
+        for i in range(0, self.patchsize * self.patchsize):
             newMessage[i] = patch[i]
-        return (header, newMessage)
+        return header, newMessage
 
     def filterSobel(self, header, patch, threshold):
         # convolve the patch with the matrix [[1,0,-1],[2,0,-2][1,0,-1]]
         # read how the convolution is applied in discrete domain
         newMessage = [0] * self.patchsize * self.patchsize
-        for i in range(1, self.patchsize-1):
-            for j in range(1, self.patchsize-1):
-                index0 = j * self.patchsize + i # top line index
-                index1 = (j+1) * self.patchsize + i # same line index
-                index1r = (j-1) * self.patchsize + i # bottom line index
+        for i in range(1, self.patchsize - 1):
+            for j in range(1, self.patchsize - 1):
+                index0 = j * self.patchsize + i  # top line index
+                index1 = (j + 1) * self.patchsize + i  # same line index
+                index1r = (j - 1) * self.patchsize + i  # bottom line index
                 temp0 = \
-                    + 1* patch[index1r - 1] \
-                    - 1* patch[index1r + 1] \
-                    + 2* patch[index0 - 1] \
-                    - 2* patch[index0 + 1] \
-                    + 1* patch[index1 - 1] \
-                    - 1* patch[index1 + 1]
+                    + 1 * patch[index1r - 1] \
+                    - 1 * patch[index1r + 1] \
+                    + 2 * patch[index0 - 1] \
+                    - 2 * patch[index0 + 1] \
+                    + 1 * patch[index1 - 1] \
+                    - 1 * patch[index1 + 1]
 
                 temp1 = \
-                    - 1* patch[index1r - 1] \
-                    - 2* patch[index1r]\
-                    - 1* patch[index1r + 1] \
-                    + 1* patch[index1 - 1] \
-                    + 2* patch[index1]\
-                    + 1* patch[index1 + 1]
+                    - 1 * patch[index1r - 1] \
+                    - 2 * patch[index1r] \
+                    - 1 * patch[index1r + 1] \
+                    + 1 * patch[index1 - 1] \
+                    + 2 * patch[index1] \
+                    + 1 * patch[index1 + 1]
 
-                newMessage[index0] = int(math.sqrt(temp0**2 + temp1**2))
+                newMessage[index0] = int(math.sqrt(temp0 ** 2 + temp1 ** 2))
                 # apply the threshold parameter
                 # if newMessage[index0] > threshold:
                 #     newMessage[index0] = 255
                 # else:
                 #     newMessage[index0] = 0
-        return (header, newMessage)
-
+        return header, newMessage
 
     def run(self):
         print self.name + ": Starting."
-        while(True):
+        while True:
             if self.inQueue.qsize() > 0:
+                outMessage = ""
                 message = self.inQueue.get()
                 if message == "END":
                     print self.name + ": Ending."
                     break
                 print self.name + ": " + str(message[0][0]) + \
-                    " " + str(message[0][1]) + " Queue size: " \
+                      " " + str(message[0][1]) + " Queue size: " \
                       + str(self.inQueue.qsize())
                 if str(message[0][0]) == "SobelFilter":
                     outMessage = self.filterSobel(message[0][1], message[1],
@@ -94,7 +97,9 @@ class WorkerThread (threading.Thread):
                 # self.pLock.release()
             time.sleep(.01)
 
-class imGui(QMainWindow):
+
+# noinspection PyPep8Naming,SpellCheckingInspection
+class ImGui(QMainWindow):
     def __init__(self, workQueue, processedQueue, pLock):
         self.qt_app = QApplication(sys.argv)
         QWidget.__init__(self, None)
@@ -137,10 +142,10 @@ class imGui(QMainWindow):
     def loadImagePressed(self):
         # load the image from a file into a QImage object
         imageFile = QFileDialog.getOpenFileName(self,
-                                              'Open file',
-                                              '.',
-                                              'Images (*.png *.xpm '
-                                              '*.jpg)' )
+                                                'Open file',
+                                                '.',
+                                                'Images (*.png *.xpm '
+                                                '*.jpg)')
         if not imageFile:
             return
         with open(imageFile, 'r') as f:
@@ -154,12 +159,12 @@ class imGui(QMainWindow):
                 self.imageFile = None
             finally:
                 self.processed = self.original.convertToFormat(
-                    QImage.Format_RGB16)
+                        QImage.Format_RGB16)
                 if self.imageFile:
                     # find the horizontal and vertical patch numgers
                     self.tmpPatchNum = (
                         self.processed.size().width() / self.patchsize,
-                        self.processed.size().height() / self.patchsize )
+                        self.processed.size().height() / self.patchsize)
                     self.numPatches = self.tmpPatchNum[0] * \
                                       self.tmpPatchNum[1]
 
@@ -175,12 +180,12 @@ class imGui(QMainWindow):
     def updateImage(self):
         # update the visual of the image with the new processed image
         if self.processed:
-            multiplierh = float(self.processed.size().height())/float(self.ui.imageView.size().height())
-            multiplierw = float(self.processed.size().width())/float(self.ui.imageView.size().width())
+            multiplierh = float(self.processed.size().height()) / float(self.ui.imageView.size().height())
+            multiplierw = float(self.processed.size().width()) / float(self.ui.imageView.size().width())
             if multiplierh > multiplierw:
-                self.frameScaled = self.processed.scaledToHeight(self.ui.imageView.size().height() - 5 )
+                self.frameScaled = self.processed.scaledToHeight(self.ui.imageView.size().height() - 5)
             else:
-                self.frameScaled = self.processed.scaledToWidth(self.ui.imageView.size().width() - 5 )
+                self.frameScaled = self.processed.scaledToWidth(self.ui.imageView.size().width() - 5)
 
             if self.sceneObject:
                 self.imageScene.removeItem(self.sceneObject)
@@ -188,19 +193,19 @@ class imGui(QMainWindow):
             self.imageScene.update()
             self.ui.imageView.setScene(self.imageScene)
 
-    def serializePatch(self, x, y, offset = 0):
+    def serializePatch(self, x, y, offset=0):
         # serializes the patch and prepares the message data
-        tempVector = [0] * (self.patchsize**2)
-        rect = (x*self.patchsize, y*self.patchsize)
-        rng = range(0,self.patchsize)
+        tempVector = [0] * (self.patchsize ** 2)
+        rect = (x * self.patchsize, y * self.patchsize)
+        rng = range(0, self.patchsize)
 
         for j in rng:
             Y = j + rect[1]
             for i in rng:
                 X = i + rect[0]
                 # the message contains 8-bit grayscale (0-255) data
-                tempVector[j*self.patchsize + i] = \
-                    rgb2gray(self.processed.pixel(X,Y))
+                tempVector[j * self.patchsize + i] = \
+                    rgb2gray(self.processed.pixel(X, Y))
                 # we should also send the reference rectangle information
                 # where to put the patch when we receive the processed
         return rect, tempVector
@@ -217,7 +222,6 @@ class imGui(QMainWindow):
                                     gray2rgb(color))
             counter += 1
 
-
     def scheduler(self):
         # puts the serialized patches into the work queue
         if self.processed:
@@ -226,11 +230,10 @@ class imGui(QMainWindow):
                 p = self.perms.pop()
                 x = p % self.tmpPatchNum[0]
                 y = p // self.tmpPatchNum[0]
-                rect, tempVector = self.serializePatch(x,y)
+                rect, tempVector = self.serializePatch(x, y)
                 self.wQueue.put(((function, rect), tempVector))
             else:
                 self.sTimer.stop()
-
 
     def collectPatch(self):
         # collects the processed patches from the process queue
@@ -271,21 +274,22 @@ def main():
     processedQueue = Queue.Queue(maxSize)
     pLock = threading.Lock()
 
-    for i in range(0,numThreads):
+    for i in range(0, numThreads):
         workThreads.append(WorkerThread("WorkerThread" + str(i),
                                         workQueue,
                                         processedQueue,
                                         pLock))
         workThreads[i].start()
 
-    app = imGui(workQueue,processedQueue, pLock)
+    app = ImGui(workQueue, processedQueue, pLock)
     app.run()
 
-    for a in range(0,numThreads):
+    for a in range(0, numThreads):
         workQueue.put("END")
 
     for thread in workThreads:
         thread.join()
+
 
 if __name__ == '__main__':
     main()
