@@ -2,7 +2,7 @@ import threading
 from _socket import gethostname
 from random import randint
 from socket import socket
-from twisted.python.util import println
+import time
 
 
 class ServerThread(threading.Thread):
@@ -13,19 +13,19 @@ class ServerThread(threading.Thread):
         self.port = port
         self.conn = None
         self.addr = None
+        self.connection_list = {}
 
     def parser(self, request):
         request = request.strip()
+        answer = ""
         if len(request) > 5:
             if request[0:5] == "HELLO":
-                # doldurulacak
-                pass
+                answer = "SALUT  P"
             elif request[0:5] == "CLOSE":
-                # doldurulacak
-                pass
+                answer = "BUBYE"
             elif request[0:5] == "REGME":
-                # doldurulacak
-                pass
+                ip, port = request[5:].split(":")
+
             elif request[0:5] == "GETNL":
                 # doldurulacak
                 pass
