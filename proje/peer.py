@@ -6,10 +6,13 @@ from twisted.python.util import println
 
 
 class ServerThread(threading.Thread):
-    def __init__(self, server_socket):
+    def __init__(self, server_socket, host, port):
         super(ServerThread, self).__init__()
         self.sock = server_socket
-        print "Server is waiting for new connection..."
+        self.host = host
+        self.port = port
+        self.conn = None
+        self.addr = None
 
     def parser(self, request):
         request = request.strip()
@@ -48,7 +51,12 @@ class ServerThread(threading.Thread):
     def run(self):
         while True:
             try:
-                data = self.sock.recv(1024)
+                self.sock.bind((self.host, self.port))
+                self.sock.listen(5)
+                print "Server is waiting for new connection..."
+                self.conn, self.addr = self.sock.accept()
+                print 'Got a connection from ', self.addr
+                data = self.conn.recv(1024)
                 self.parser(data)
             except Exception, ex:
                 print ex.message
@@ -67,10 +75,8 @@ def main():
     server_socket = socket()
     port = randint(50000, 65000)
     try:
-        server_socket.bind((host, port))
-        server_socket.listen(5)
 
-        server_thread = ServerThread(server_socket)
+        server_thread = ServerThread(server_socket, host, port)
         server_thread.run()
 
         client_thread = ClientThread()
