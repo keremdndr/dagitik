@@ -48,10 +48,17 @@ class ServerWorkerThread(threading.Thread):
 
     def run(self):
         while True:
-            if self.inqueue.qsize() > 0:
-                connection = self.inqueue.get()
-                request = connection[0].recv(1024)
-                self.parser(request)
+            try:
+                if self.inqueue.qsize() > 0:
+                    request = ""
+                    connection = self.inqueue.get()
+                    message_length = connection[0].recv(100)
+                    while len(request) < message_length:
+                        request += connection[0].recv(1024)
+                    self.parser(request)
+            except Exception, ex:
+                print ex.message
+                return
 
 
 class ServerThread(threading.Thread):
@@ -77,6 +84,7 @@ class ServerThread(threading.Thread):
                 self.queue.put((self.conn, self.addr))
             except Exception, ex:
                 print ex.message
+                return
 
 
 class ClientThread(threading.Thread):
@@ -107,6 +115,7 @@ def main():
 
     except Exception, ex:
         print ex.message
+        return
 
 
 if __name__ == '__main__':
