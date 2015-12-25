@@ -3,45 +3,71 @@ from Queue import Queue
 from _socket import gethostname
 from random import randint
 from socket import socket
+import ip
 import time
 
 THREADNUM = 5
+CONNECT_POINT_LIST = []  # list array of [ip,port,type,time]
 
 
 class ServerWorkerThread(threading.Thread):
-    def __init__(self, inqueue):
+    def __init__(self, inqueue, cpl_lock, client_queue):
         super(ServerWorkerThread, self).__init__()
+        self.client_queue = client_queue
+        self.cpl_lock = cpl_lock
         self.inqueue = inqueue
+        self.connection = None
 
-    def parser(self, request):
+    def sock_send(self, data):
+        try:
+            self.connection[0].sendall(data)
+        except Exception, ex:
+            print ex.message
+
+    def parser(self, request, client_queue):
         request = request.strip()
         answer = ""
+
         if len(request) > 5:
             if request[0:5] == "HELLO":
-                answer = "SALUT P"
-            elif request[0:5] == "CLOSE":
-                answer = "BUBYE"
-            elif request[0:5] == "REGME":
-                ip, port = request[5:].split(":")
-
-            elif request[0:5] == "GETNL":
-                # doldurulacak
-                pass
-            elif request[0:5] == "FUNLS":
-                # doldurulacak
-                pass
-            elif request[0:5] == "FUNRQ":
-                # doldurulacak
-                pass
-            elif request[0:5] == "EXERQ":
-                # doldurulacak
-                pass
-            elif request[0:5] == "PATCH":
-                # doldurulacak
-                pass
+                self.sock_send("SALUT P")
+            elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
+                for conn in CONNECT_POINT_LIST:
+                    if self.connection[1][0] in conn:  # if connection's ip address is in cpl
+                        if request[0:5] == "CLOSE":
+                            self.sock_send("BUBYE")
+                        elif request[0:5] == "GETNL":
+                            # doldurulacak
+                            pass
+                        elif request[0:5] == "FUNLS":
+                            # doldurulacak
+                            pass
+                        elif request[0:5] == "FUNRQ":
+                            # doldurulacak
+                            pass
+                        elif request[0:5] == "EXERQ":
+                            # doldurulacak
+                            pass
+                        elif request[0:5] == "PATCH":
+                            # doldurulacak
+                            pass
+                        else:
+                            # cmderr
+                            pass
+                else:
+                    self.sock_send("REGERR")
             else:
-                # cmderr
-                pass
+                conn_ip, port = request[5:].split(":")
+                for conn in CONNECT_POINT_LIST:
+                    if conn_ip in conn and port in conn:
+                        self.sock_send("REGOK")
+                        self.cpl_lock.acquire()
+                        conn[3] = time.time()
+                        self.cpl_lock.release()
+                    else:
+                        self.sock_send("REGWA")
+                        addr = (conn_ip, port)
+                        self.client_queue.put((addr,"HELLO"))
         else:
             # cmderr
             pass
@@ -51,11 +77,10 @@ class ServerWorkerThread(threading.Thread):
             try:
                 if self.inqueue.qsize() > 0:
                     request = ""
-                    connection = self.inqueue.get()
-                    message_length = connection[0].recv(100)
+                    self.connection = self.inqueue.get()
+                    message_length = int(self.connection[0].recv(100))
                     while len(request) < message_length:
-                        request += connection[0].recv(1024)
-                    self.parser(request)
+                        request += self.connection[0].recv(1024)
             except Exception, ex:
                 print ex.message
                 return
@@ -88,11 +113,27 @@ class ServerThread(threading.Thread):
 
 
 class ClientThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, client_queue, cpl_lock):
         super(ClientThread, self).__init__()
+        self.cpl_lock = cpl_lock
+        self.client_queue = client_queue
 
     def requester(self):
         pass
+
+    def conn_sock(self, addr):
+        s = socket()
+        s.connect(addr)
+        return s
+
+    def run(self):
+        request = self.client_queue.get()
+        addr = request[0]
+        mess = request[1]
+        s = self.conn_sock(addr)
+        s.sendall(mess)
+        if s.recv(100) == "SALUT P":
+            pass
 
 
 def main():
@@ -100,17 +141,19 @@ def main():
     server_socket = socket()
     port = randint(50000, 65000)
     threads = []
-    server_queue = Queue()
+    server_queue = Queue(50)
+    client_queue = Queue(50)
+    cpl_lock = threading.Lock()
     try:
-        for t in range(0,THREADNUM):
-            thread = ServerWorkerThread(server_queue)
+        for t in range(0, THREADNUM):
+            thread = ServerWorkerThread(server_queue, cpl_lock, client_queue)
             thread.start()
             threads.append(thread)
 
-        server_thread = ServerThread(server_socket, host, port)
+        server_thread = ServerThread(server_socket, host, port, server_queue)
         server_thread.run()
 
-        client_thread = ClientThread()
+        client_thread = ClientThread(client_queue, cpl_lock)
         client_thread.run()
 
     except Exception, ex:
