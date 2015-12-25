@@ -24,9 +24,8 @@ class ServerWorkerThread(threading.Thread):
         except Exception, ex:
             print ex.message
 
-    def parser(self, request, client_queue):
+    def parser(self, request):
         request = request.strip()
-        answer = ""
 
         if len(request) > 5:
             if request[0:5] == "HELLO":
@@ -67,7 +66,7 @@ class ServerWorkerThread(threading.Thread):
                     else:
                         self.sock_send("REGWA")
                         addr = (conn_ip, port)
-                        self.client_queue.put((addr,"HELLO"))
+                        self.client_queue.put((addr, "HELLO"))
         else:
             # cmderr
             pass
