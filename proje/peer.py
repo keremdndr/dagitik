@@ -53,9 +53,9 @@ class ServerWorkerThread(threading.Thread):
                         else:
                             # cmderr
                             pass
-                else:
+                else:  # not in cpl and not regme
                     self.sock_send("REGERR")
-            else:
+            else:  # regme
                 conn_ip, port = request[5:].split(":")
                 for conn in CONNECT_POINT_LIST:
                     if conn_ip in conn and port in conn:
@@ -126,13 +126,16 @@ class ClientThread(threading.Thread):
         return s
 
     def run(self):
-        request = self.client_queue.get()
-        addr = request[0]
-        mess = request[1]
-        s = self.conn_sock(addr)
-        s.sendall(mess)
-        if s.recv(100) == "SALUT P":
-            pass
+        try:
+            request = self.client_queue.get()
+            addr = request[0]
+            mess = request[1]
+            s = self.conn_sock(addr)
+            s.sendall(mess)
+            if s.recv(100) == "SALUT P":
+                CONNECT_POINT_LIST.append([addr[0], addr[1], "P", time.time()])
+        except Exception, ex:
+            print ex.message
 
 
 def main():
