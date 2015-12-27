@@ -2,7 +2,7 @@ import threading
 from Queue import Queue
 from _socket import gethostname
 from random import randint
-from socket import socket
+from socket import socket, error
 import ip
 import time
 
@@ -28,7 +28,7 @@ class ServerWorkerThread(threading.Thread):
         request = request.strip()
 
         if len(request) > 5:
-            if request[0:5] == "HELLO":
+            if request[0:5] == "HELLO":  # hello request doesn't need registration.
                 self.sock_send("SALUT P")
             elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
                 for conn in CONNECT_POINT_LIST:
@@ -57,19 +57,18 @@ class ServerWorkerThread(threading.Thread):
                     self.sock_send("REGERR")
             else:  # regme
                 conn_ip, port = request[5:].split(":")
+                self.cpl_lock.acquire()
                 for conn in CONNECT_POINT_LIST:
                     if conn_ip in conn and port in conn:
                         self.sock_send("REGOK")
-                        self.cpl_lock.acquire()
                         conn[3] = time.time()
-                        self.cpl_lock.release()
-                    else:
-                        self.sock_send("REGWA")
-                        addr = (conn_ip, port)
-                        self.client_queue.put((addr, "HELLO"))
+                else:
+                    self.sock_send("REGWA")
+                    addr = (conn_ip, port)
+                    self.client_queue.put((addr, "HELLO"))
+                self.cpl_lock.release()
         else:
-            # cmderr
-            pass
+            self.sock_send("CMDER")
 
     def run(self):
         while True:
@@ -80,6 +79,7 @@ class ServerWorkerThread(threading.Thread):
                     message_length = int(self.connection[0].recv(100))
                     while len(request) < message_length:
                         request += self.connection[0].recv(1024)
+                    self.parser(request)
             except Exception, ex:
                 print ex.message
                 return
@@ -116,6 +116,8 @@ class ClientThread(threading.Thread):
         super(ClientThread, self).__init__()
         self.cpl_lock = cpl_lock
         self.client_queue = client_queue
+        self.timer = threading.Timer(1.0, self.check_request())
+        self.timer.start()
 
     def requester(self):
         pass
@@ -125,15 +127,39 @@ class ClientThread(threading.Thread):
         s.connect(addr)
         return s
 
-    def run(self):
+    def check_server(self,addr):
         try:
+            s = socket()
+            s.connect(addr)
+            s.sendall("HELLO")
+            ans = s.recv(1024)
+            ans = ans.strip()
+            if ans == "SALUT P" or ans == "SALUT N":
+                self.cpl_lock.acquire()
+                for conn in CONNECT_POINT_LIST:
+                    if addr[0] in conn and addr[1] in conn:
+                        conn[3] = time.time()
+                else:
+                    CONNECT_POINT_LIST.append([addr[0], addr[1], ans[6], time.time()])
+                self.cpl_lock.release()
+            else:
+                s.sendall("CMDERR")
+        except error, err:
+            print err.message
+
+    def check_request(self):
+        if self.client_queue.qsize() > 0:
             request = self.client_queue.get()
             addr = request[0]
             mess = request[1]
-            s = self.conn_sock(addr)
-            s.sendall(mess)
-            if s.recv(100) == "SALUT P":
-                CONNECT_POINT_LIST.append([addr[0], addr[1], "P", time.time()])
+            if mess == "HELLO":
+                self.check_server(addr)
+            else:
+                pass  # doldurulacak
+
+    def run(self):
+        try:
+            pass
         except Exception, ex:
             print ex.message
 
