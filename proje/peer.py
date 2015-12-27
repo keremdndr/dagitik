@@ -36,8 +36,20 @@ class ServerWorkerThread(threading.Thread):
                         if request[0:5] == "CLOSE":
                             self.sock_send("BUBYE")
                         elif request[0:5] == "GETNL":
-                            # doldurulacak
-                            pass
+                            nlsize = len(CONNECT_POINT_LIST)
+                            i = 1
+                            if len(request) > 5:
+                                nlsize = int(request[5:])
+                            self.sock_send("NLIST BEGIN\n")
+                            for conn2 in CONNECT_POINT_LIST:
+                                self.sock_send(conn2[0] + ":" +
+                                               conn2[1] + ":" +
+                                               conn2[2] + ":" +
+                                               conn2[3] + "\n")
+                                i += 1
+                                if i == nlsize:
+                                    break
+                            self.sock_send("NLIST END")
                         elif request[0:5] == "FUNLS":
                             # doldurulacak
                             pass
@@ -127,7 +139,7 @@ class ClientThread(threading.Thread):
         s.connect(addr)
         return s
 
-    def check_server(self,addr):
+    def check_server(self, addr):
         try:
             s = socket()
             s.connect(addr)
