@@ -23,14 +23,14 @@ class ServerThread(threading.Thread):
         self.port = SERVER_PORT
 
     def run(self):
-        self.sock.bind((self.host, self.port))
-        self.sock.listen(5)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
         while True:
             try:
                 print "Server is waiting for new connection..."
-                self.conn, self.conn_addr = self.sock.accept()
-                print 'Got a connection from ', self.addr
-                self.queue.put((self.conn, self.addr))
+                self.conn, self.conn_addr = self.server_socket.accept()
+                print 'Got a connection from ', self.conn_addr
+                self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
                 print ex.message
                 return
@@ -143,7 +143,7 @@ class ClientThread(threading.Thread):
         except error, err:
             print err.message
 
-    def close_conn(self,addr):
+    def close_conn(self, addr):
         try:
             s = self.conn_sock(addr)
             s.sendall("CLOSE")
