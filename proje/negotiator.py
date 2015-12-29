@@ -1,6 +1,6 @@
 import threading
 from Queue import Queue
-from _socket import gethostname
+from _socket import gethostname, error
 from socket import socket
 
 import time
@@ -51,7 +51,6 @@ class ServerWorkerThread(threading.Thread):
 
     def parser(self, request):
         request = request.strip()
-
         if len(request) > 5:
             if request[0:5] == "HELLO":  # hello request doesn't need registration.
                 self.sock_send("SALUT N")
@@ -60,9 +59,25 @@ class ServerWorkerThread(threading.Thread):
                     if self.connection[1][0] in conn:  # if connection's ip address is in cpl
                         if request[0:5] == "CLOSE":
                             self.sock_send("BUBYE")
+                        elif request[0:5] == "GETNL":
+                            nlsize = len(CONNECT_POINT_LIST)
+                            i = 1
+                            if len(request) > 5:
+                                nlsize = int(request[5:])
+                            self.sock_send("NLIST BEGIN\n")
+                            for conn2 in CONNECT_POINT_LIST:
+                                self.sock_send(conn2[0] + ":" +
+                                               conn2[1] + ":" +
+                                               conn2[2] + ":" +
+                                               conn2[3] + "\n")
+                                i += 1
+                                if i == nlsize:
+                                    break
+                            self.sock_send("NLIST END")
                         else:
                             self.sock_send("CMDERR")
                             pass
+                        break
                 else:  # not in cpl and not regme
                     self.sock_send("REGERR")
             else:  # regme
@@ -72,6 +87,7 @@ class ServerWorkerThread(threading.Thread):
                     if conn_ip in conn and port in conn:
                         self.sock_send("REGOK")
                         conn[3] = time.time()
+                        break
                 else:
                     self.sock_send("REGWA")
                     addr = (conn_ip, port)
@@ -93,6 +109,67 @@ class ServerWorkerThread(threading.Thread):
             except Exception, ex:
                 print ex.message
                 return
+
+
+class ClientThread(threading.Thread):
+    def __init__(self, client_queue, cpl_lock):
+        super(ClientThread, self).__init__()
+        self.cpl_lock = cpl_lock
+        self.client_queue = client_queue
+
+    def conn_sock(self, addr):
+        s = socket()
+        s.connect(addr)
+        return s
+
+    def check_server(self, addr):
+        try:
+            s = self.conn_sock(addr)
+            s.sendall("HELLO")
+            ans = s.recv(1024)
+            ans = ans.strip()
+            if ans == "SALUT P" or ans == "SALUT N":
+                self.cpl_lock.acquire()
+                for conn in CONNECT_POINT_LIST:
+                    if addr[0] in conn and addr[1] in conn:
+                        conn[3] = time.time()
+                        break
+                else:
+                    CONNECT_POINT_LIST.append([addr[0], addr[1], ans[6], time.time()])
+                self.cpl_lock.release()
+            else:
+                s.sendall("CMDERR")
+        except error, err:
+            print err.message
+
+    def close_conn(self,addr):
+        try:
+            s = self.conn_sock(addr)
+            s.sendall("CLOSE")
+            ans = s.recv(1024)
+            ans = ans.strip()
+            if ans[:5] == "BUBYE":
+                s.close()
+            else:
+                s.sendall("CMDERR")
+        except Exception, ex:
+            print ex.message
+
+    def run(self):
+        try:
+            while True:
+                if self.client_queue.qsize() > 0:
+                    request = self.client_queue.get()
+                    addr = request[0]
+                    mess = request[1]
+                    if mess == "HELLO":
+                        self.check_server(addr)
+                    elif mess == "CLOSE":
+                        self.close_conn(addr)
+                    else:
+                        pass  # doldurulacak
+        except Exception, ex:
+            print ex.message
 
 
 def main():
