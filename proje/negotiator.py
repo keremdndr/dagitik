@@ -7,6 +7,8 @@ import time
 
 THREADNUM = 5
 CONNECT_POINT_LIST = []  # list array of [ip,port,type,time]
+SERVER_PORT = 12345
+SERVER_HOST = gethostname()
 
 
 class ServerThread(threading.Thread):
@@ -14,12 +16,11 @@ class ServerThread(threading.Thread):
         super(ServerThread, self).__init__()
         self.conn = None
         self.conn_addr = None
-        self.connection_list = {}
         self.queue = server_conn_queue
         self.threads = []
-        self.host = gethostname()
+        self.host = SERVER_HOST
         self.server_socket = socket()
-        self.port = 12345
+        self.port = SERVER_PORT
 
     def run(self):
         self.sock.bind((self.host, self.port))
