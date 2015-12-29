@@ -103,15 +103,22 @@ def main():
     try:
         for t in range(0, THREADNUM):
             thread = ServerWorkerThread(server_queue, cpl_lock, client_queue)
+            thread.daemon = True
             thread.start()
             threads.append(thread)
 
         server_thread = ServerThread(server_queue)
+        server_thread.daemon = True
         server_thread.run()
+        threads.append(server_thread)
 
         client_thread = ClientThread(client_queue, cpl_lock)
+        client_thread.daemon = True
         client_thread.run()
+        threads.append(client_thread)
 
+        for t in threads:
+            t.join()
     except Exception, ex:
         print ex.message
         return
