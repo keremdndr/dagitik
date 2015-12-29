@@ -8,7 +8,9 @@ import time
 
 THREADNUM = 5
 CONNECT_POINT_LIST = []  # list array of [ip,port,type,time]
-
+FUNCTION_LIST = ["grayscale","binarize","sobelfilter","gaussianfilter","prewittfilter"]
+SERVER_HOST = gethostname()
+SERVER_PORT = randint(50000,65000)
 
 class ServerWorkerThread(threading.Thread):
     def __init__(self, inqueue, cpl_lock, client_queue):
@@ -65,6 +67,7 @@ class ServerWorkerThread(threading.Thread):
                         else:
                             # cmderr
                             pass
+                        break
                 else:  # not in cpl and not regme
                     self.sock_send("REGERR")
             else:  # regme
@@ -74,6 +77,7 @@ class ServerWorkerThread(threading.Thread):
                     if conn_ip in conn and port in conn:
                         self.sock_send("REGOK")
                         conn[3] = time.time()
+                        break
                 else:
                     self.sock_send("REGWA")
                     addr = (conn_ip, port)
@@ -98,16 +102,15 @@ class ServerWorkerThread(threading.Thread):
 
 
 class ServerThread(threading.Thread):
-    def __init__(self, server_socket, host, port, server_conn_queue):
+    def __init__(self, server_conn_queue):
         super(ServerThread, self).__init__()
-        self.sock = server_socket
-        self.host = host
-        self.port = port
         self.conn = None
-        self.addr = None
-        self.connection_list = {}
+        self.conn_addr = None
         self.queue = server_conn_queue
         self.threads = []
+        self.host = SERVER_HOST
+        self.server_socket = socket()
+        self.port = SERVER_PORT
 
     def run(self):
         self.sock.bind((self.host, self.port))
@@ -115,7 +118,7 @@ class ServerThread(threading.Thread):
         while True:
             try:
                 print "Server is waiting for new connection..."
-                self.conn, self.addr = self.sock.accept()
+                self.conn, self.conn_addr = self.sock.accept()
                 print 'Got a connection from ', self.addr
                 self.queue.put((self.conn, self.addr))
             except Exception, ex:
@@ -151,6 +154,7 @@ class ClientThread(threading.Thread):
                 for conn in CONNECT_POINT_LIST:
                     if addr[0] in conn and addr[1] in conn:
                         conn[3] = time.time()
+                        break
                 else:
                     CONNECT_POINT_LIST.append([addr[0], addr[1], ans[6], time.time()])
                 self.cpl_lock.release()
@@ -169,17 +173,21 @@ class ClientThread(threading.Thread):
             else:
                 pass  # doldurulacak
 
+    def update(self):
+        self.cpl_lock.acquire()
+        for conn in CONNECT_POINT_LIST:
+            if conn[2] == "N":
+                s = self.conn_sock((conn[0],conn[1]))
+                s.sendall("GETNL")
+                break
     def run(self):
         try:
-            pass
+
         except Exception, ex:
             print ex.message
 
 
 def main():
-    host = gethostname()
-    server_socket = socket()
-    port = randint(50000, 65000)
     threads = []
     server_queue = Queue(50)
     client_queue = Queue(50)
@@ -190,7 +198,7 @@ def main():
             thread.start()
             threads.append(thread)
 
-        server_thread = ServerThread(server_socket, host, port, server_queue)
+        server_thread = ServerThread(server_queue)
         server_thread.run()
 
         client_thread = ClientThread(client_queue, cpl_lock)
