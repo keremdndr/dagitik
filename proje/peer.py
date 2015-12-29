@@ -113,8 +113,8 @@ class ServerThread(threading.Thread):
         self.port = SERVER_PORT
 
     def run(self):
-        self.sock.bind((self.host, self.port))
-        self.sock.listen(5)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
         while True:
             try:
                 print "Server is waiting for new connection..."
@@ -182,7 +182,7 @@ class ClientThread(threading.Thread):
                 break
     def run(self):
         try:
-
+            pass
         except Exception, ex:
             print ex.message
 
