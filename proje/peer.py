@@ -8,9 +8,10 @@ import time
 
 THREADNUM = 5
 CONNECT_POINT_LIST = []  # list array of [ip,port,type,time]
-FUNCTION_LIST = ["grayscale","binarize","sobelfilter","gaussianfilter","prewittfilter"]
+FUNCTION_LIST = ["grayscale", "binarize", "sobelfilter", "gaussianfilter", "prewittfilter"]
 SERVER_HOST = gethostname()
-SERVER_PORT = randint(50000,65000)
+SERVER_PORT = randint(50000, 65000)
+
 
 class ServerWorkerThread(threading.Thread):
     def __init__(self, inqueue, cpl_lock, client_queue):
@@ -118,9 +119,9 @@ class ServerThread(threading.Thread):
         while True:
             try:
                 print "Server is waiting for new connection..."
-                self.conn, self.conn_addr = self.sock.accept()
-                print 'Got a connection from ', self.addr
-                self.queue.put((self.conn, self.addr))
+                self.conn, self.conn_addr = self.server_socket.accept()
+                print 'Got a connection from ', self.conn_addr
+                self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
                 print ex.message
                 return
@@ -177,9 +178,10 @@ class ClientThread(threading.Thread):
         self.cpl_lock.acquire()
         for conn in CONNECT_POINT_LIST:
             if conn[2] == "N":
-                s = self.conn_sock((conn[0],conn[1]))
+                s = self.conn_sock((conn[0], conn[1]))
                 s.sendall("GETNL")
                 break
+
     def run(self):
         try:
             pass
