@@ -29,10 +29,9 @@ class ServerWorkerThread(threading.Thread):
 
     def parser(self, request):
         request = request.strip()
-
-        if len(request) > 5:
+        if len(request) >= 5:
             if request[0:5] == "HELLO":  # hello request doesn't need registration.
-                self.sock_send("SALUT P")
+                self.sock_send("SALUT N")
             elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
                 for conn in CONNECT_POINT_LIST:
                     if self.connection[1][0] in conn:  # if connection's ip address is in cpl
@@ -40,48 +39,44 @@ class ServerWorkerThread(threading.Thread):
                             self.sock_send("BUBYE")
                         elif request[0:5] == "GETNL":
                             nlsize = len(CONNECT_POINT_LIST)
-                            i = 1
+                            i = 0
                             if len(request) > 5:
-                                nlsize = int(request[5:])
+                                nlsize = int(request[6:])
                             self.sock_send("NLIST BEGIN\n")
                             for conn2 in CONNECT_POINT_LIST:
                                 self.sock_send(conn2[0] + ":" +
-                                               conn2[1] + ":" +
+                                               str(conn2[1]) + ":" +
                                                conn2[2] + ":" +
-                                               conn2[3] + "\n")
+                                               str(conn2[3]) + "\n")
                                 i += 1
                                 if i == nlsize:
                                     break
                             self.sock_send("NLIST END")
                         elif request[0:5] == "FUNLS":
-                            # doldurulacak
                             pass
                         elif request[0:5] == "FUNRQ":
-                            # doldurulacak
                             pass
                         elif request[0:5] == "EXERQ":
-                            # doldurulacak
                             pass
                         elif request[0:5] == "PATCH":
-                            # doldurulacak
                             pass
                         else:
-                            # cmderr
+                            self.sock_send("CMDERR")
                             pass
                         break
                 else:  # not in cpl and not regme
                     self.sock_send("REGERR")
             else:  # regme
-                conn_ip, port = request[5:].split(":")
+                conn_ip, port = request[6:].split(":")
                 self.cpl_lock.acquire()
                 for conn in CONNECT_POINT_LIST:
-                    if conn_ip in conn and port in conn:
+                    if conn_ip in conn and int(port) in conn:
                         self.sock_send("REGOK")
                         conn[3] = time.time()
                         break
                 else:
                     self.sock_send("REGWA")
-                    addr = (conn_ip, port)
+                    addr = (conn_ip, int(port))
                     self.client_queue.put((addr, "HELLO"))
                 self.cpl_lock.release()
         else:
@@ -91,12 +86,13 @@ class ServerWorkerThread(threading.Thread):
         while True:
             try:
                 if self.inqueue.qsize() > 0:
-                    request = ""
                     self.connection = self.inqueue.get()
-                    message_length = int(self.connection[0].recv(100))
-                    while len(request) < message_length:
-                        request += self.connection[0].recv(1024)
-                    self.parser(request)
+                    request = ""
+                    while request != "CLOSE":
+                        request = self.connection[0].recv(1024)
+                        request = request.strip()
+                        self.parser(request)
+                    self.connection[0].close()
             except Exception, ex:
                 print ex
                 return
@@ -180,14 +176,36 @@ class ClientThread(threading.Thread):
             if conn[2] == "N":
                 s = self.conn_sock((conn[0], conn[1]))
                 s.sendall("GETNL")
-                break
+                rec = s.recv(100)
+                rec.strip()
+                if rec == "NLIST BEGIN":
+                    while rec != "NLIST END":
+                        rec = s.recv(200)
+                        rec.strip()
+                        conn_point = rec.split(":")
+                        conn_point[2] = int(conn_point[1])
+                        conn_point[3] = float(conn_point[3])
+                        for conn2 in CONNECT_POINT_LIST:
+                            if conn_point[0] in conn2 and conn_point[1] in conn2:
+                                if conn_point[3] > conn2[3]:
+                                    conn2[3] = conn_point[3]
+                        else:
+                            CONNECT_POINT_LIST.append(conn_point)
+
+    def conn_system(self):
+        s = socket()
+        s.connect((gethostname(), 12345))
+        CONNECT_POINT_LIST.append([gethostname(), 12345, "N", time.time()])
+        self.update()
+        print "Client Thread: Connection to the system is successful." \
+              "Here the current peers available:"
+        for c in CONNECT_POINT_LIST:
+            print c[0], c[1], c[2]
 
     def run(self):
         try:
-            s = socket()
-            s.connect((gethostname(), 12345))
-            s.close()
-            print "peer client sonlandirildi"
+            self.conn_system()
+
         except Exception, ex:
             print ex
 
