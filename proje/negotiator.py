@@ -1,6 +1,6 @@
 import threading
 from Queue import Queue
-from _socket import gethostname, error
+from _socket import gethostname
 from socket import socket
 
 import time
@@ -12,8 +12,9 @@ SERVER_HOST = gethostname()
 
 
 class ServerThread(threading.Thread):
-    def __init__(self, server_conn_queue):
+    def __init__(self, name, server_conn_queue):
         super(ServerThread, self).__init__()
+        self.name = name
         self.conn = None
         self.conn_addr = None
         self.queue = server_conn_queue
@@ -24,7 +25,8 @@ class ServerThread(threading.Thread):
 
     def run(self):
         self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
+        self.server_socket.listen(10)
+
         while True:
             try:
                 print "Server is waiting for new connection..."
@@ -32,7 +34,8 @@ class ServerThread(threading.Thread):
                 print 'Got a connection from ', self.conn_addr
                 self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
-                print ex.message
+                print ex
+                self.server_socket.close()
                 return
 
 
@@ -48,11 +51,11 @@ class ServerWorkerThread(threading.Thread):
         try:
             self.connection[0].sendall(data)
         except Exception, ex:
-            print ex.message
+            print ex
 
     def parser(self, request):
         request = request.strip()
-        if len(request) > 5:
+        if len(request) >= 5:
             if request[0:5] == "HELLO":  # hello request doesn't need registration.
                 self.sock_send("SALUT N")
             elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
@@ -62,15 +65,15 @@ class ServerWorkerThread(threading.Thread):
                             self.sock_send("BUBYE")
                         elif request[0:5] == "GETNL":
                             nlsize = len(CONNECT_POINT_LIST)
-                            i = 1
+                            i = 0
                             if len(request) > 5:
-                                nlsize = int(request[5:])
+                                nlsize = int(request[6:])
                             self.sock_send("NLIST BEGIN\n")
                             for conn2 in CONNECT_POINT_LIST:
                                 self.sock_send(conn2[0] + ":" +
-                                               conn2[1] + ":" +
+                                               str(conn2[1]) + ":" +
                                                conn2[2] + ":" +
-                                               conn2[3] + "\n")
+                                               str(conn2[3]) + "\n")
                                 i += 1
                                 if i == nlsize:
                                     break
@@ -82,16 +85,16 @@ class ServerWorkerThread(threading.Thread):
                 else:  # not in cpl and not regme
                     self.sock_send("REGERR")
             else:  # regme
-                conn_ip, port = request[5:].split(":")
+                conn_ip, port = request[6:].split(":")
                 self.cpl_lock.acquire()
                 for conn in CONNECT_POINT_LIST:
-                    if conn_ip in conn and port in conn:
+                    if conn_ip in conn and int(port) in conn:
                         self.sock_send("REGOK")
                         conn[3] = time.time()
                         break
                 else:
                     self.sock_send("REGWA")
-                    addr = (conn_ip, port)
+                    addr = (conn_ip, int(port))
                     self.client_queue.put((addr, "HELLO"))
                 self.cpl_lock.release()
         else:
@@ -101,20 +104,22 @@ class ServerWorkerThread(threading.Thread):
         while True:
             try:
                 if self.inqueue.qsize() > 0:
-                    request = ""
                     self.connection = self.inqueue.get()
-                    message_length = int(self.connection[0].recv(100))
-                    while len(request) < message_length:
-                        request += self.connection[0].recv(1024)
-                    self.parser(request)
+                    request = ""
+                    while request != "CLOSE":
+                        request = self.connection[0].recv(1024)
+                        request = request.strip()
+                        self.parser(request)
+                    self.connection[0].close()
             except Exception, ex:
-                print ex.message
+                print ex
                 return
 
 
 class ClientThread(threading.Thread):
-    def __init__(self, client_queue, cpl_lock):
+    def __init__(self, name, client_queue, cpl_lock):
         super(ClientThread, self).__init__()
+        self.name = name
         self.cpl_lock = cpl_lock
         self.client_queue = client_queue
 
@@ -140,8 +145,8 @@ class ClientThread(threading.Thread):
                 self.cpl_lock.release()
             else:
                 s.sendall("CMDERR")
-        except error, err:
-            print err.message
+        except Exception, ex:
+            print ex
 
     def close_conn(self, addr):
         try:
@@ -154,7 +159,7 @@ class ClientThread(threading.Thread):
             else:
                 s.sendall("CMDERR")
         except Exception, ex:
-            print ex.message
+            print ex
 
     def run(self):
         try:
@@ -165,12 +170,12 @@ class ClientThread(threading.Thread):
                     mess = request[1]
                     if mess == "HELLO":
                         self.check_server(addr)
-                    elif mess == "CLOSE":
-                        self.close_conn(addr)
+                    elif mess == None:
+                        pass
                     else:
-                        pass  # doldurulacak
+                        pass
         except Exception, ex:
-            print ex.message
+            print ex
 
 
 def main():
@@ -185,21 +190,20 @@ def main():
             thread.start()
             threads.append(thread)
 
-        server_thread = ServerThread(server_queue)
+        server_thread = ServerThread("Server Thread", server_queue)
         server_thread.daemon = True
-        server_thread.run()
+        server_thread.start()
         threads.append(server_thread)
 
-        client_thread = ClientThread(client_queue, cpl_lock)
+        client_thread = ClientThread("Client Thread", client_queue, cpl_lock)
         client_thread.daemon = True
-        client_thread.run()
+        client_thread.start()
         threads.append(client_thread)
 
         for t in threads:
             t.join()
     except Exception, ex:
-        print ex.message
-        return
+        print ex
 
 
 if __name__ == '__main__':
