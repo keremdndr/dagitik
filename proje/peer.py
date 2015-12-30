@@ -9,14 +9,14 @@ import time
 THREADNUM = 3
 CONNECT_POINT_LIST = [[gethostname(), 12345, "N", time.time()]]  # list array of [ip,port,type,time]
 #  initialised with known nego
-FUNCTION_LIST = ["grayscale", "binarize", "sobelfilter", "gaussianfilter", "prewittfilter"]
+FUNCTION_LIST = ["grayscale", "binarize:threshold", "sobelfilter:threshold", "prewittfilter:threshold"]
 SERVER_HOST = gethostname()
 SERVER_PORT = randint(50000, 65000)
 
 
 class ServerWorkerThread(threading.Thread):
-    def __init__(self, inqueue, cpl_lock, client_queue):
-        super(ServerWorkerThread, self).__init__()
+    def __init__(self, name, inqueue, cpl_lock, client_queue):
+        super(ServerWorkerThread, self).__init__(name=name)
         self.client_queue = client_queue
         self.cpl_lock = cpl_lock
         self.inqueue = inqueue
@@ -26,7 +26,7 @@ class ServerWorkerThread(threading.Thread):
         try:
             self.connection[0].sendall(data)
         except Exception, ex:
-            print ex
+            print self.name, ex, "sock_send"
 
     def parser(self, request):
         request = request.strip()
@@ -54,9 +54,19 @@ class ServerWorkerThread(threading.Thread):
                                     break
                             self.sock_send("NLIST END")
                         elif request[0:5] == "FUNLS":
-                            pass
+                            self.sock_send("FUNLI BEGIN\n")
+                            for f in FUNCTION_LIST:
+                                self.sock_send(f+"\n")
+                            self.sock_send("FUNLI END")
                         elif request[0:5] == "FUNRQ":
-                            pass
+                            func_name = request[6:]
+                            for f in FUNCTION_LIST:
+                                name, param = f.split(":")
+                                if name == func_name:
+                                    self.sock_send("FUNYS "+f)
+                                    break
+                            else:
+                                self.sock_send("FUNNO "+func_name)
                         elif request[0:5] == "EXERQ":
                             pass
                         elif request[0:5] == "PATCH":
@@ -95,13 +105,12 @@ class ServerWorkerThread(threading.Thread):
                         self.parser(request)
                     self.connection[0].close()
             except Exception, ex:
-                print ex
-                return
+                print self.name, ex, "run"
 
 
 class ServerThread(threading.Thread):
-    def __init__(self, server_conn_queue):
-        super(ServerThread, self).__init__()
+    def __init__(self, name, server_conn_queue):
+        super(ServerThread, self).__init__(name=name)
         self.conn = None
         self.conn_addr = None
         self.queue = server_conn_queue
@@ -120,18 +129,17 @@ class ServerThread(threading.Thread):
                 print 'Got a connection from ', self.conn_addr
                 self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
-                print ex
-                return
+                print self.name, ex
 
 
 class ClientThread(threading.Thread):
-    def __init__(self, client_queue, cpl_lock):
-        super(ClientThread, self).__init__()
+    def __init__(self, name, client_queue, cpl_lock):
+        super(ClientThread, self).__init__(name=name)
         self.cpl_lock = cpl_lock
         self.client_queue = client_queue
         self.timer = threading.Timer(1.0, self.check_request())
         self.timer.start()
-        self.utimer = threading.Timer(600, self.update)
+        self.utimer = threading.Timer(600.0, self.update())
         self.utimer.start()
 
     def conn_sock(self, addr):
@@ -157,7 +165,7 @@ class ClientThread(threading.Thread):
             else:
                 s.sendall("CMDERR")
         except error, err:
-            print err
+            print self.name, err
 
     def check_request(self):
         if self.client_queue.qsize() > 0:
@@ -178,7 +186,7 @@ class ClientThread(threading.Thread):
                 rec = s.recv(100)
                 rec.strip()
                 if rec == "REGER":
-                    success = self.conn_peer(s)
+                    success = self.conn_peer((conn[0], conn[1]))
                     if not success:
                         print "Couldn't connect to peer, ", conn
                         CONNECT_POINT_LIST.remove(conn)
@@ -196,7 +204,9 @@ class ClientThread(threading.Thread):
                         else:
                             CONNECT_POINT_LIST.append(conn_point)
 
-    def conn_peer(self, s, i=0):
+    def conn_peer(self, addr, i=0):
+        s = socket()
+        s.connect(addr)
         s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
         ans = s.recv(100)
         i += 1
@@ -221,7 +231,7 @@ class ClientThread(threading.Thread):
                       "Now will try to update NLIST"
                 self.update()
         except Exception, ex:
-            print ex
+            print self.name, ex
 
 
 def main():
@@ -238,15 +248,15 @@ def main():
     process_lock = threading.Lock()
     try:
         for t in range(0, THREADNUM):
-            thread = ServerWorkerThread(server_queue, cpl_lock, client_queue)
+            thread = ServerWorkerThread("Server Worker Thread "+str(t), server_queue, cpl_lock, client_queue)
             thread.start()
             threads.append(thread)
 
-        server_thread = ServerThread(server_queue)
+        server_thread = ServerThread("Main server thread", server_queue)
         server_thread.start()
         threads.append(server_thread)
 
-        client_thread = ClientThread(client_queue, cpl_lock)
+        client_thread = ClientThread("Maine Client Thread", client_queue, cpl_lock)
         client_thread.start()
         threads.append(client_thread)
 
@@ -261,7 +271,7 @@ def main():
         for t in threads:
             t.join()
     except Exception, ex:
-        print ex
+        print __name__, ex
         return
 
 
