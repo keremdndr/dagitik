@@ -25,7 +25,7 @@ class ServerWorkerThread(threading.Thread):
         try:
             self.connection[0].sendall(data)
         except Exception, ex:
-            print ex.message
+            print ex
 
     def parser(self, request):
         request = request.strip()
@@ -98,7 +98,7 @@ class ServerWorkerThread(threading.Thread):
                         request += self.connection[0].recv(1024)
                     self.parser(request)
             except Exception, ex:
-                print ex.message
+                print ex
                 return
 
 
@@ -123,7 +123,7 @@ class ServerThread(threading.Thread):
                 print 'Got a connection from ', self.conn_addr
                 self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
-                print ex.message
+                print ex
                 return
 
 
@@ -162,7 +162,7 @@ class ClientThread(threading.Thread):
             else:
                 s.sendall("CMDERR")
         except error, err:
-            print err.message
+            print err
 
     def check_request(self):
         if self.client_queue.qsize() > 0:
@@ -184,9 +184,12 @@ class ClientThread(threading.Thread):
 
     def run(self):
         try:
-            pass
+            s = socket()
+            s.connect((gethostname(), 12345))
+            s.close()
+            print "peer client sonlandirildi"
         except Exception, ex:
-            print ex.message
+            print ex
 
 
 def main():
@@ -201,13 +204,17 @@ def main():
             threads.append(thread)
 
         server_thread = ServerThread(server_queue)
-        server_thread.run()
+        server_thread.start()
+        threads.append(server_thread)
 
         client_thread = ClientThread(client_queue, cpl_lock)
-        client_thread.run()
+        client_thread.start()
+        threads.append(client_thread)
 
+        for t in threads:
+            t.join()
     except Exception, ex:
-        print ex.message
+        print ex
         return
 
 
