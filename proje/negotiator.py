@@ -34,14 +34,14 @@ class ServerThread(threading.Thread):
                 print 'Got a connection from ', self.conn_addr
                 self.queue.put((self.conn, self.conn_addr))
             except Exception, ex:
-                print ex
+                print self.name, ex, "run"
                 self.server_socket.close()
                 return
 
 
 class ServerWorkerThread(threading.Thread):
-    def __init__(self, inqueue, cpl_lock, client_queue):
-        super(ServerWorkerThread, self).__init__()
+    def __init__(self, name, inqueue, cpl_lock, client_queue):
+        super(ServerWorkerThread, self).__init__(name=name)
         self.client_queue = client_queue
         self.cpl_lock = cpl_lock
         self.inqueue = inqueue
@@ -51,7 +51,7 @@ class ServerWorkerThread(threading.Thread):
         try:
             self.connection[0].sendall(data)
         except Exception, ex:
-            print ex
+            print self.name, ex, "sock_send"
 
     def parser(self, request):
         request = request.strip()
@@ -104,6 +104,7 @@ class ServerWorkerThread(threading.Thread):
         while True:
             try:
                 if self.inqueue.qsize() > 0:
+                    print self.name, " gets connection."
                     self.connection = self.inqueue.get()
                     request = ""
                     while request != "CLOSE":
@@ -112,7 +113,7 @@ class ServerWorkerThread(threading.Thread):
                         self.parser(request)
                     self.connection[0].close()
             except Exception, ex:
-                print ex
+                print self.name, ex, "run"
                 return
 
 
@@ -146,7 +147,7 @@ class ClientThread(threading.Thread):
             else:
                 s.sendall("CMDERR")
         except Exception, ex:
-            print ex
+            print self.name, ex, "check_server"
 
     def close_conn(self, addr):
         try:
@@ -159,7 +160,7 @@ class ClientThread(threading.Thread):
             else:
                 s.sendall("CMDERR")
         except Exception, ex:
-            print ex
+            print self.name, ex, "close_conn"
 
     def run(self):
         try:
@@ -175,7 +176,7 @@ class ClientThread(threading.Thread):
                     else:
                         pass
         except Exception, ex:
-            print ex
+            print self.name, ex, "run"
 
 
 def main():
@@ -185,7 +186,7 @@ def main():
     cpl_lock = threading.Lock()
     try:
         for t in range(0, THREADNUM):
-            thread = ServerWorkerThread(server_queue, cpl_lock, client_queue)
+            thread = ServerWorkerThread("Server Worker Thread "+str(t), server_queue, cpl_lock, client_queue)
             thread.daemon = True
             thread.start()
             threads.append(thread)
@@ -203,7 +204,7 @@ def main():
         for t in threads:
             t.join()
     except Exception, ex:
-        print ex
+        print __name__, ex
 
 
 if __name__ == '__main__':
