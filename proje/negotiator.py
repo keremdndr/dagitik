@@ -83,7 +83,7 @@ class ServerWorkerThread(threading.Thread):
                             pass
                         break
                 else:  # not in cpl and not regme
-                    self.sock_send("REGERR")
+                    self.sock_send("REGER")
             else:  # regme
                 conn_ip, port = request[6:].split(":")
                 self.cpl_lock.acquire()
