@@ -22,76 +22,85 @@ class ServerWorkerThread(threading.Thread):
         self.inqueue = inqueue
         self.connection = None
 
-    def sock_send(self, data):
-        try:
-            self.connection[0].sendall(data)
-        except Exception, ex:
-            print self.name, ex, "sock_send"
-
     def parser(self, request):
         request = request.strip()
         if len(request) >= 5:
             if request[0:5] == "HELLO":  # hello request doesn't need registration.
-                self.sock_send("SALUT P")
+                data = "SALUT P"
+                self.connection[0].sendall(data)
             elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
                 for conn in CONNECT_POINT_LIST:
                     if self.connection[1][0] in conn:  # if connection's ip address is in cpl
                         if request[0:5] == "CLOSE":
-                            self.sock_send("BUBYE")
+                            data = "BUBYE"
+                            self.connection[0].sendall(data)
                         elif request[0:5] == "GETNL":
                             nlsize = len(CONNECT_POINT_LIST)
                             i = 0
                             if len(request) > 5:
                                 nlsize = int(request[6:])
-                            self.sock_send("NLIST BEGIN\n")
+                            data = "NLIST BEGIN\n"
+                            self.connection[0].sendall(data)
                             for conn2 in CONNECT_POINT_LIST:
-                                self.sock_send(conn2[0] + ":" +
-                                               str(conn2[1]) + ":" +
-                                               conn2[2] + ":" +
-                                               str(conn2[3]) + "\n")
+                                data = conn2[0] + ":" \
+                                       + str(conn2[1]) + ":" \
+                                       + conn2[2] + ":" \
+                                       + str(conn2[3]) + "\n"
+                                self.connection[0].sendall(data)
                                 i += 1
                                 if i == nlsize:
                                     break
-                            self.sock_send("NLIST END")
+                            data = "NLIST END"
+                            self.connection[0].sendall(data)
                         elif request[0:5] == "FUNLS":
-                            self.sock_send("FUNLI BEGIN\n")
+                            data = "FUNLI BEGIN\n"
+                            self.connection[0].sendall(data)
                             for f in FUNCTION_LIST:
-                                self.sock_send(f+"\n")
-                            self.sock_send("FUNLI END")
+                                data = f+"\n"
+                                self.connection[0].sendall(data)
+                            data = "FUNLI END"
+                            self.connection[0].sendall(data)
                         elif request[0:5] == "FUNRQ":
                             func_name = request[6:]
                             for f in FUNCTION_LIST:
                                 name, param = f.split(":")
                                 if name == func_name:
-                                    self.sock_send("FUNYS "+f)
+                                    data = "FUNYS "+f
+                                    self.connection[0].sendall(data)
                                     break
                             else:
-                                self.sock_send("FUNNO "+func_name)
+                                data = "FUNNO "+func_name
+                                self.connection[0].sendall(data)
                         elif request[0:5] == "EXERQ":
                             pass
                         elif request[0:5] == "PATCH":
                             pass
                         else:
-                            self.sock_send("CMDERR")
+                            data = "CMDERR"
+                            self.connection[0].sendall(data)
                             pass
                         break
                 else:  # not in cpl and not regme
-                    self.sock_send("REGER")
+                    data = "REGER"
+                    self.connection[0].sendall(data)
             else:  # regme
                 conn_ip, port = request[6:].split(":")
                 self.cpl_lock.acquire()
                 for conn in CONNECT_POINT_LIST:
                     if conn_ip in conn and int(port) in conn:
-                        self.sock_send("REGOK")
+                        data = "REGOK"
+                        self.connection[0].sendall(data)
                         conn[3] = time.time()
                         break
                 else:
-                    self.sock_send("REGWA")
+                    data = "REGWA"
+                    self.connection[0].sendall(data)
                     addr = (conn_ip, int(port))
                     self.client_queue.put((addr, "HELLO"))
                 self.cpl_lock.release()
         else:
-            self.sock_send("CMDER")
+            data = "CMDER"
+            self.connection[0].sendall(data)
 
     def run(self):
         while True:
@@ -137,8 +146,6 @@ class ClientThread(threading.Thread):
         super(ClientThread, self).__init__(name=name)
         self.cpl_lock = cpl_lock
         self.client_queue = client_queue
-        self.timer = threading.Timer(1.0, self.check_request())
-        self.timer.start()
         self.utimer = threading.Timer(600.0, self.update())
         self.utimer.start()
 
@@ -167,16 +174,6 @@ class ClientThread(threading.Thread):
         except error, err:
             print self.name, err
 
-    def check_request(self):
-        if self.client_queue.qsize() > 0:
-            request = self.client_queue.get()
-            addr = request[0]
-            mess = request[1]
-            if mess == "HELLO":
-                self.check_server(addr)
-            else:
-                pass  # doldurulacak
-
     def update(self):
         self.cpl_lock.acquire()
         for conn in CONNECT_POINT_LIST:
@@ -186,11 +183,17 @@ class ClientThread(threading.Thread):
                 rec = s.recv(100)
                 rec.strip()
                 if rec == "REGER":
-                    success = self.conn_peer((conn[0], conn[1]))
-                    if not success:
-                        print "Couldn't connect to peer, ", conn
-                        CONNECT_POINT_LIST.remove(conn)
-                elif rec == "NLIST BEGIN":
+                    s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
+                    ans = s.recv(100)
+                    if ans.strip() == "REGWA":
+                        time.sleep(3)
+                        s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
+                        ans = s.recv(100)
+                    if ans.strip() == "REGOK":
+                        s.sendall("GETNL")
+                        rec = s.recv(100)
+                        rec.strip()
+                if rec == "NLIST BEGIN":
                     while rec != "NLIST END":
                         rec = s.recv(200)
                         rec.strip()
@@ -204,25 +207,19 @@ class ClientThread(threading.Thread):
                         else:
                             CONNECT_POINT_LIST.append(conn_point)
 
-    def conn_peer(self, addr, i=0):
+    def conn_system(self):
         s = socket()
-        s.connect(addr)
+        s.connect((gethostname(), 12345))
         s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
         ans = s.recv(100)
-        i += 1
         if ans.strip() == "REGWA":
-            time.sleep(3 * i)
-            i += 1
-            if i == 3:
-                return False
-            self.conn_peer(s, i)
-        elif ans.strip() == "REGOK":
+            time.sleep(3)
+            s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
+            ans = s.recv(100)
+        if ans.strip() == "REGOK":
             return True
         else:
             return False
-
-    def conn_system(self):
-        return self.conn_peer(self.conn_sock((gethostname(), 12345)))
 
     def run(self):
         try:
@@ -230,6 +227,17 @@ class ClientThread(threading.Thread):
                 print "Connected to first negotiator." \
                       "Now will try to update NLIST"
                 self.update()
+            else:
+                print "Could't connected to first Negotiator, please try again later."
+            while True:
+                if self.client_queue.qsize() > 0:
+                    request = self.client_queue.get()
+                    addr = request[0]
+                    mess = request[1]
+                    if mess == "HELLO":
+                        self.check_server(addr)
+                    else:
+                        pass  # doldurulacak
         except Exception, ex:
             print self.name, ex
 
@@ -266,8 +274,8 @@ def main():
             w_thread.start()
             worker_threads.append(w_thread)
 
-        app = ip.ImGui(worker_queue, processed_queue, process_lock)
-        app.run()
+#        app = ip.ImGui(worker_queue, processed_queue, process_lock)
+#        app.run()
         for t in threads:
             t.join()
     except Exception, ex:
