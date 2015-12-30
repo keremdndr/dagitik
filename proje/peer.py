@@ -6,8 +6,9 @@ from socket import socket, error
 import ip
 import time
 
-THREADNUM = 5
-CONNECT_POINT_LIST = []  # list array of [ip,port,type,time]
+THREADNUM = 3
+CONNECT_POINT_LIST = [[gethostname(), 12345, "N", time.time()]]  # list array of [ip,port,type,time]
+#  initialised with known nego
 FUNCTION_LIST = ["grayscale", "binarize", "sobelfilter", "gaussianfilter", "prewittfilter"]
 SERVER_HOST = gethostname()
 SERVER_PORT = randint(50000, 65000)
@@ -31,7 +32,7 @@ class ServerWorkerThread(threading.Thread):
         request = request.strip()
         if len(request) >= 5:
             if request[0:5] == "HELLO":  # hello request doesn't need registration.
-                self.sock_send("SALUT N")
+                self.sock_send("SALUT P")
             elif not request[0:5] == "REGME":  # if the protocol is not register, check the cpl
                 for conn in CONNECT_POINT_LIST:
                     if self.connection[1][0] in conn:  # if connection's ip address is in cpl
@@ -65,7 +66,7 @@ class ServerWorkerThread(threading.Thread):
                             pass
                         break
                 else:  # not in cpl and not regme
-                    self.sock_send("REGERR")
+                    self.sock_send("REGER")
             else:  # regme
                 conn_ip, port = request[6:].split(":")
                 self.cpl_lock.acquire()
@@ -130,9 +131,8 @@ class ClientThread(threading.Thread):
         self.client_queue = client_queue
         self.timer = threading.Timer(1.0, self.check_request())
         self.timer.start()
-
-    def requester(self):
-        pass
+        self.utimer = threading.Timer(600, self.update)
+        self.utimer.start()
 
     def conn_sock(self, addr):
         s = socket()
@@ -141,8 +141,7 @@ class ClientThread(threading.Thread):
 
     def check_server(self, addr):
         try:
-            s = socket()
-            s.connect(addr)
+            s = self.conn_sock(addr)
             s.sendall("HELLO")
             ans = s.recv(1024)
             ans = ans.strip()
@@ -178,7 +177,12 @@ class ClientThread(threading.Thread):
                 s.sendall("GETNL")
                 rec = s.recv(100)
                 rec.strip()
-                if rec == "NLIST BEGIN":
+                if rec == "REGER":
+                    success = self.conn_peer(s)
+                    if not success:
+                        print "Couldn't connect to peer, ", conn
+                        CONNECT_POINT_LIST.remove(conn)
+                elif rec == "NLIST BEGIN":
                     while rec != "NLIST END":
                         rec = s.recv(200)
                         rec.strip()
@@ -192,20 +196,30 @@ class ClientThread(threading.Thread):
                         else:
                             CONNECT_POINT_LIST.append(conn_point)
 
+    def conn_peer(self, s, i=0):
+        s.sendall("REGME " + str(SERVER_HOST) + ":" + str(SERVER_PORT))
+        ans = s.recv(100)
+        i += 1
+        if ans.strip() == "REGWA":
+            time.sleep(3 * i)
+            i += 1
+            if i == 3:
+                return False
+            self.conn_peer(s, i)
+        elif ans.strip() == "REGOK":
+            return True
+        else:
+            return False
+
     def conn_system(self):
-        s = socket()
-        s.connect((gethostname(), 12345))
-        CONNECT_POINT_LIST.append([gethostname(), 12345, "N", time.time()])
-        self.update()
-        print "Client Thread: Connection to the system is successful." \
-              "Here the current peers available:"
-        for c in CONNECT_POINT_LIST:
-            print c[0], c[1], c[2]
+        return self.conn_peer(self.conn_sock((gethostname(), 12345)))
 
     def run(self):
         try:
-            self.conn_system()
-
+            if self.conn_system():
+                print "Connected to first negotiator." \
+                      "Now will try to update NLIST"
+                self.update()
         except Exception, ex:
             print ex
 
@@ -215,6 +229,13 @@ def main():
     server_queue = Queue(50)
     client_queue = Queue(50)
     cpl_lock = threading.Lock()
+    # ip class variables
+    thread_number = 3
+    max_size = thread_number * 25
+    worker_threads = []
+    worker_queue = Queue()
+    processed_queue = Queue(max_size)
+    process_lock = threading.Lock()
     try:
         for t in range(0, THREADNUM):
             thread = ServerWorkerThread(server_queue, cpl_lock, client_queue)
@@ -229,6 +250,14 @@ def main():
         client_thread.start()
         threads.append(client_thread)
 
+        # ip class threads and app begin
+        for i in range(0, thread_number):
+            w_thread = ip.WorkerThread("Worker Thread "+str(i), worker_queue, processed_queue, process_lock)
+            w_thread.start()
+            worker_threads.append(w_thread)
+
+        app = ip.ImGui(worker_queue, processed_queue, process_lock)
+        app.run()
         for t in threads:
             t.join()
     except Exception, ex:
