@@ -34,6 +34,42 @@ class WorkerThread(threading.Thread):
         self.pLock = pLock
         self.patchsize = 128
 
+    def binarize(self, header, patch, threshold):
+        newMessage = [0] * self.patchsize * self.patchsize
+        for i in range(0, self.patchsize * self.patchsize):
+            if newMessage[i] < threshold:
+                newMessage[i] = 0
+            else:
+                newMessage[i] = 255
+        return header, newMessage
+
+    def prewittfilter(self, header, patch, threshold):
+        p1, p2, p3, p4, p5, p6, p7, p8, p9 = 0, 0, 0, 0, 0, 0, 0, 0, 0
+        newMessage = [0] * self.patchsize * self.patchsize
+        for i in range(1, self.patchsize - 1):
+            for j in range(1, self.patchsize - 1):
+                index0 = j * self.patchsize + i  # top line index
+                index1 = (j + 1) * self.patchsize + i  # same line index
+                index1r = (j - 1) * self.patchsize + i  # bottom line index
+                temp0 = \
+                    - 1 * patch[index1r - 1] \
+                    + 1 * patch[index1r + 1] \
+                    - 1 * patch[index0 - 1] \
+                    + 1 * patch[index0 + 1] \
+                    - 1 * patch[index1 - 1] \
+                    + 1 * patch[index1 + 1]
+
+                temp1 = \
+                    + 1 * patch[index1r - 1] \
+                    + 1 * patch[index1r] \
+                    + 1 * patch[index1r + 1] \
+                    - 1 * patch[index1 - 1] \
+                    - 1 * patch[index1] \
+                    - 1 * patch[index1 + 1]
+
+                newMessage[index0] = int(math.sqrt(temp0 ** 2 + temp1 ** 2))
+        return header, newMessage
+
     def convertGray(self, header, patch):
         # convert the patch to gray (actually does nothing as the incoming
         # data is already 8bit gray scale data)
@@ -52,20 +88,20 @@ class WorkerThread(threading.Thread):
                 index1 = (j + 1) * self.patchsize + i  # same line index
                 index1r = (j - 1) * self.patchsize + i  # bottom line index
                 temp0 = \
-                    + 1 * patch[index1r - 1] \
-                    - 1 * patch[index1r + 1] \
-                    + 2 * patch[index0 - 1] \
-                    - 2 * patch[index0 + 1] \
-                    + 1 * patch[index1 - 1] \
-                    - 1 * patch[index1 + 1]
+                    - 1 * patch[index1r - 1] \
+                    + 1 * patch[index1r + 1] \
+                    - 1 * patch[index0 - 1] \
+                    + 1 * patch[index0 + 1] \
+                    - 1 * patch[index1 - 1] \
+                    + 1 * patch[index1 + 1]
 
                 temp1 = \
-                    - 1 * patch[index1r - 1] \
-                    - 2 * patch[index1r] \
-                    - 1 * patch[index1r + 1] \
-                    + 1 * patch[index1 - 1] \
-                    + 2 * patch[index1] \
-                    + 1 * patch[index1 + 1]
+                    + 1 * patch[index1r - 1] \
+                    + 1 * patch[index1r] \
+                    + 1 * patch[index1r + 1] \
+                    - 1 * patch[index1 - 1] \
+                    - 1 * patch[index1] \
+                    - 1 * patch[index1 + 1]
 
                 newMessage[index0] = int(math.sqrt(temp0 ** 2 + temp1 ** 2))
                 # apply the threshold parameter
@@ -92,6 +128,10 @@ class WorkerThread(threading.Thread):
                                                   128)
                 if str(message[0][0]) == "GrayScale":
                     outMessage = self.convertGray(message[0][1], message[1])
+                if str(message[0][0]) == "Prewitt":
+                    outMessage = self.prewittfilter(message[0][1], message[1], 122)
+                if str(message[0][0]) == "Binarize":
+                    outMessage = self.binarize(message[0][1], message[1], 122)
                 # self.pLock.acquire()
                 self.outQueue.put(outMessage)
                 # self.pLock.release()
@@ -120,7 +160,8 @@ class ImGui(QMainWindow):
         # fill combobox
         self.ui.boxFunction.addItem("GrayScale")
         self.ui.boxFunction.addItem("SobelFilter")
-
+        self.ui.boxFunction.addItem("Prewitt")
+        self.ui.boxFunction.addItem("Binarize")
         # connect buttons
         self.ui.buttonLoadImage.clicked.connect(self.loadImagePressed)
         self.ui.buttonResetImage.clicked.connect(self.resetImagePressed)
